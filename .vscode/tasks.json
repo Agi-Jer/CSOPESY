@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "-std=c++20", 
+                "${workspaceFolder}/main.cpp",
+                "-lncurses",
+                "-pthread",
+                "-o",
+                "${workspaceFolder}/main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "run-in-ptyxis",
+            "type": "shell",
+            "dependsOn": "build",
+            "command": "ptyxis",
+            "args": [
+                "--",
+                "bash",
+                "-c",
+                "${workspaceFolder}/main; echo; read -p 'Press Enter to close...'"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

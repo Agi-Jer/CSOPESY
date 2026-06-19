@@ -6,12 +6,14 @@
 #include <chrono>
 #include <iostream>
 #include <atomic>
+#include <memory> // Required for std::unique_ptr and std::make_unique
 #include "Core.h" 
 
 class CPU {
 private:
     int numCores;
-    std::vector<Core> cores;
+    // Updated to use unique_ptr so non-copyable/non-movable Cores can reside safely
+    std::vector<std::unique_ptr<Core>> cores;
     
     std::thread cpuThread;
     std::atomic<bool> isRunning;
@@ -50,9 +52,9 @@ public:
         isRunning = true;
         
         // Pass references to the operational flags and our updated atomic clock count
-        // Instantiate the blank Core classes into our vector
+        // Instantiate the blank Core classes into our vector via make_unique
         for (int i = 0; i < numCores; ++i) {
-            cores.push_back(Core(i, isRunning, cycleCount, "FCFS")); // Correctly passes Core ID (0, 1, 2...) and type
+            cores.push_back(std::make_unique<Core>(i, isRunning, cycleCount, "FCFS")); 
         }
             
         cpuThread = std::thread(&CPU::runCPULoop, this);
@@ -79,10 +81,10 @@ public:
     std::vector<Process> getRunningProcesses() const {
         std::vector<Process> runningProcesses;
 
-        // Loop through each core to pull active process information thread-safely
+        // Loop through each core pointer to pull active process information thread-safely
         for (const auto& core : cores) {
             Process p("dummy", -1);
-            if (core.getActiveProcessCopy(p)) {
+            if (core->getActiveProcessCopy(p)) { // Changed '.' to '->' since elements are pointers
                 runningProcesses.push_back(p);
             }
         }

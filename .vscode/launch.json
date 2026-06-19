@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run in Ptyxis",
+            "type": "cppdbg",
+            "request": "launch",
+            // Points to a dummy binary to satisfy VS Code while running our custom task
+            "program": "/bin/true",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "run-in-ptyxis",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "externalConsole": false
+        }
+    ]
+}
