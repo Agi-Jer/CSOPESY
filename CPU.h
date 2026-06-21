@@ -24,7 +24,9 @@ private:
     // background cpu cycle thread
     void runCPULoop() {
         // ~30 cycles per second (approx 33.33ms per cycle)
-        auto cycleDuration = std::chrono::microseconds(33333); // ~30 Hz
+        //auto cycleDuration = std::chrono::microseconds(33333); // ~30 Hz
+        //slower for this example
+        auto cycleDuration = std::chrono::milliseconds(250);//~4Hz
 
         while (isRunning) {
             auto startTime = std::chrono::steady_clock::now();
@@ -83,8 +85,8 @@ public:
 
         // Loop through each core pointer to pull active process information thread-safely
         for (const auto& core : cores) {
-            Process p("dummy", -1);
-            if (core->getActiveProcessCopy(p)) { // Changed '.' to '->' since elements are pointers
+            Process p; // Changed '.' to '->' since elements are pointers
+            if (core->getActiveProcessCopy(p)) { 
                 runningProcesses.push_back(p);
             }
         }

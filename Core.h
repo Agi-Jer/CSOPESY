@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <mutex> // Added for thread safety when CPU reads the process
+#include <memory>
 #include "Process.h"
 #include "RQ.h"
 
@@ -14,7 +15,7 @@ class Core {
 private:
     int coreId;
     std::string type;
-    Process currentProcess;
+    std::unique_ptr<Process> currentProcess;
     bool holdsProcess;
 
     std::thread workerThread;
@@ -52,19 +53,24 @@ private:
 
                 // FCFS Scheduler Action: Grab a process if idle
                 if (!holdsProcess) {
-                    if (RQ::tryPopReady(currentProcess)) {
+                    Process poppedProcess; // Temporary container for tryPopReady
+                    if (RQ::tryPopReady(poppedProcess)) {
+                        
+                        // Allocate the raw process onto the heap safely!
+                        currentProcess = std::make_unique<Process>(poppedProcess);
+                        
                         holdsProcess = true;
-                        currentProcess.setAssignedCore(coreId);
-                        //std::cout << "Core " << coreId << " grabbed Process " << currentProcess.getPid() << " on Cycle " << currCycle << std::endl;
+                        currentProcess->setAssignedCore(coreId); // Use -> instead of .
                     }
                 }
 
                 // Execution of Instruction
-                if (holdsProcess) {
-                    currentProcess.executeInstruction();
+                if (holdsProcess && currentProcess != nullptr) {
+                    currentProcess->executeInstruction();
 
-                    if (currentProcess.isFinished()) { 
-                        RQ::addToFinished(currentProcess);
+                    if (currentProcess->isFinished()) { 
+                        RQ::addToFinished(*currentProcess);
+                        currentProcess.reset();
                         holdsProcess = false; 
                         //std::cout << "Core " << coreId << " finished Process " << currentProcess.getPid() << " on Cycle " << currCycle << std::endl;
                     }
@@ -76,7 +82,7 @@ private:
 public:
     // Make a thread on construction
     Core(int id, std::atomic<bool>& cpuRunFlag, const std::atomic<unsigned long long>& cpuCycle, std::string coreType = "FCFS") 
-        : coreId(id), type(coreType), holdsProcess(false), currentProcess("dummy", -1),
+        : coreId(id), type(coreType), currentProcess(nullptr), holdsProcess(false),
           cpuRunningRef(cpuRunFlag), globalCycleRef(cpuCycle), currCycle(0) {
         
         workerThread = std::thread(&Core::runCoreLoop, this);
@@ -93,19 +99,21 @@ public:
     // Check if the core is currently busy
     bool isHoldingProcess() const { 
         std::lock_guard<std::mutex> lock(coreMutex);
-        return holdsProcess; 
+        return holdsProcess && (currentProcess != nullptr); 
     }
     // Read the process currently assigned to this core
     const Process& getCurrentProcess() const { 
         std::lock_guard<std::mutex> lock(coreMutex);
-        return currentProcess;
+        return *currentProcess;
     }
 
     // Thread-safe method for the CPU to extract an active process copy safely
     bool getActiveProcessCopy(Process& outProcess) const {
         std::lock_guard<std::mutex> lock(coreMutex);
-        if (holdsProcess) {
-            outProcess = currentProcess;
+        
+        // CRITICAL FIX: Only copy if the pointer is NOT null!
+        if (holdsProcess && currentProcess != nullptr) {
+            outProcess = *currentProcess; // Dereference the pointer safely
             return true;
         }
         return false;

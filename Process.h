@@ -38,6 +38,7 @@ private:
     std::string formatTimestamp(const std::chrono::system_clock::time_point& tp) const {
         std::time_t currentTime = std::chrono::system_clock::to_time_t(tp);
         std::tm* localTime = std::localtime(&currentTime);
+        if (!localTime) return "(00/00/0000 00:00:00AM)";
 
         char buffer[40];
         // Format the core time units: %m = Month, %d = Day, %Y = Year, %I = 12-hour clock, %M = Minute, %S = Second, %p = AM/PM
@@ -82,6 +83,14 @@ private:
     }
 
 public:
+    // Safe default constructor for creating clean display/extraction containers without ticking the counter
+    Process() 
+        : pid(-1), name("unassigned"), assignedCore(-1), finished(false), 
+          currentInstruction(0), totalInstructions(0) {
+        dateCreated = std::chrono::system_clock::now();
+        dateLastInstruction = dateCreated;
+    }
+
     // New constructor handling auto-increment PID, targeted string name naming conventions, and automatic vector padding
     Process(std::string commandType, int totalInst = 100) 
         : currentInstruction(0), totalInstructions(totalInst), finished(false), assignedCore(-1) {
