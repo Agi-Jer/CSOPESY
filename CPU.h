@@ -9,17 +9,26 @@
 #include <memory> // Required for std::unique_ptr and std::make_unique
 #include "Core.h" 
 
+/*
+Represents an abstraction of the CPU itself
+
+handles primarily the Cores and the cpu cycle logic
+
+Wrapper for Cores
+*/
+
+
 class CPU {
 private:
-    int numCores;
+    int numCores; //Num of cores in CPU
     // Updated to use unique_ptr so non-copyable/non-movable Cores can reside safely
-    std::vector<std::unique_ptr<Core>> cores;
+    std::vector<std::unique_ptr<Core>> cores; //Vector of Core class
     
-    std::thread cpuThread;
-    std::atomic<bool> isRunning;
+    std::thread cpuThread; //Clock cycle Thread
+    std::atomic<bool> isRunning; //Bool to check if CPU is still running
     
     // Updated to an atomic type so cores can sleep on it cleanly
-    std::atomic<unsigned long long> cycleCount; 
+    std::atomic<unsigned long long> cycleCount; //CPU cycle tracker
 
     // background cpu cycle thread
     void runCPULoop() {
@@ -80,6 +89,7 @@ public:
     }
 
     // Aggregates and returns a vector containing copies of only the active running processes across all cores
+    // For UI management (e.g. Screen -ls)
     std::vector<Process> getRunningProcesses() const {
         std::vector<Process> runningProcesses;
 

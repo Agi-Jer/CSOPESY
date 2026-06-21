@@ -11,17 +11,25 @@
 #include "Process.h"
 #include "RQ.h"
 
+/*
+The Core class is an abstraction of a cpu core
+
+It handles all processing and decides when to take or add to the RQ (e.g. Round Robin)
+*/
+
+
 class Core {
 private:
-    int coreId;
-    std::string type;
-    std::unique_ptr<Process> currentProcess;
-    bool holdsProcess;
+    int coreId; //Core Id starts from 0 counting up
+    std::string type; //FCFS or RR
+    std::unique_ptr<Process> currentProcess; //Process its currently handling in core
+    bool holdsProcess; //Bool if core is currently handling a process
 
-    std::thread workerThread;
-    std::atomic<bool>& cpuRunningRef; 
+    std::thread workerThread; //Worker thread for FCFS or RR logic
+    std::atomic<bool>& cpuRunningRef; //Checks if CPU is still running for when exit function is called
     
-    // Updated to reference an atomic unsigned long long
+   //Counters for keeping track and updating the current clock cycle
+   //Makes sures each thread only runs once per cycle
     const std::atomic<unsigned long long>& globalCycleRef; 
     unsigned long long currCycle; 
 
@@ -29,6 +37,8 @@ private:
     // by this thread while the CPU thread is trying to read them for the UI
     mutable std::mutex coreMutex; 
 
+
+    //Main Loop of the TCore Thread
     void runCoreLoop() {
         while (cpuRunningRef) {
             
@@ -88,13 +98,14 @@ public:
         workerThread = std::thread(&Core::runCoreLoop, this);
     }
 
+    //Deconstructor to make sure no threads are lost
     ~Core() {
         if (workerThread.joinable()) {
             workerThread.join();
         }
     }
 
-    //getters
+    //Getters
     int getCoreId() const { return coreId; }
     // Check if the core is currently busy
     bool isHoldingProcess() const { 
@@ -108,6 +119,7 @@ public:
     }
 
     // Thread-safe method for the CPU to extract an active process copy safely
+    // This is meant for reading the process (e.g. Screen -ls)
     bool getActiveProcessCopy(Process& outProcess) const {
         std::lock_guard<std::mutex> lock(coreMutex);
         

@@ -8,6 +8,15 @@
 #include "RQ.h"
 #include "Process.h"
 
+/*
+Handles all the scren processing logic
+
+e.g. Screen -ls, Cpu Utilization
+
+Everything is handled statically
+All data is gathered and handled at time of UI calling
+*/
+
 class Screen {
 private:
     // Initializes ncurses properties safely for a brief snapshot view
