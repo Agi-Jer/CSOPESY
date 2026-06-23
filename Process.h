@@ -49,6 +49,9 @@ private:
     unsigned int sleepTimer = 0;// Handles process sleep cycles
     ProcessState state = ProcessState::READY; // Current scheduling lifecycle state
 
+    //PROCESS SMI
+    std::string screenLogBuffer;    //Log Buffer for process-smi
+
     // DELAYS PER EXEC
     // You know i could have min and max be a static variable initialized on startup as well
     // Oh Well too late
@@ -145,7 +148,17 @@ private:
     }
 
     void executePrint(const std::vector<std::string>& args) {
-        // Hook screen buffer logs here when needed
+        std::string rawMessage = args[0];
+
+        // Get current timestamp and core details at this exact instruction tick
+        std::string timestamp = formatTimestamp(dateLastInstruction);
+        std::string coreStr = "Core:" + (assignedCore != -1 ? std::to_string(assignedCore) : "N/A");
+
+        // Format matches mockup: (MM/DD/YYYY hh:mm:ssAM/PM) Core:X "Message"
+        std::string formattedLog = timestamp + " " + coreStr + " \"" + rawMessage + "\"";
+
+        // Push right into our screen history buffer!
+        screenLogBuffer.push_back(formattedLog);
     }
     
 public:
@@ -163,7 +176,7 @@ public:
           currentInstruction(0), state(ProcessState::READY) {
         
         // Call the generation offshoot factory once to build the instruction list
-        instructions = GenerateProcessInstructions::createProgram(minIns, maxIns);
+        instructions = GenerateProcessInstructions::createProgram(name, minIns, maxIns);
 
         totalInstructions = static_cast<int>(instructions.size());
         dateCreated = std::chrono::system_clock::now();
@@ -188,12 +201,13 @@ public:
             return; // Burn this CPU cycle doing absolutely nothing
         }
 
-        // Route the current active line to the execution handler
-        executeInstruction(instructions[currentInstruction]);
-
+        //Reset State
         currentInstruction++;
         dateLastInstruction = std::chrono::system_clock::now();  
         currentDelayCounter = globalDelayPerExec; // If globalDelayPerExec is 0, this sets it to 0, running 1 instruction per cycle perfectly.
+        
+        // Route the current active line to the execution handler
+        executeInstruction(instructions[currentInstruction]);
 
         if (currentInstruction >= static_cast<int>(instructions.size())) {
             finished = true;

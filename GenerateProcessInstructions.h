@@ -6,6 +6,10 @@
 #include <cstdlib>
 #include "Instruction.h"
 
+/*
+Class to offshoot the complicated logic for randomly generating instructions.
+*/
+
 // Temporary scratchpad used only during generation to safely calculate nested sizing
 struct InstructionBlueprint {
     OpCode op;
@@ -31,12 +35,13 @@ private:
     inline static const std::vector<std::string> VAR_POOL = {"x", "y", "z", "i", "j", "k"};
 
     // Helper to randomly select between a variable (30% chance) or a number literal (70% chance)
-    static std::string selectArgRandom(const std::string& varToken, const std::string& numToken) {
+    static std::string selectArgRandomly(const std::string& varToken, const std::string& numToken) {
         return (rand() % 100 < 30) ? varToken : numToken;
     }
 
     // Unified recursive blueprint generator (Handles all 6 opcodes cleanly)
-    static InstructionBlueprint generateSingleBlueprint(int currentDepth) {
+    // Caches processName to dynamically build the required specification PRINT string literal
+    static InstructionBlueprint generateSingleBlueprint(int currentDepth, const std::string& processName) {
         InstructionBlueprint bp;
         
         // Pick randomly from all possible instructions. 
@@ -52,7 +57,8 @@ private:
         switch (choice) {
             case 0: 
                 bp.op = OpCode::PRINT; 
-                bp.args = {v1}; 
+                // Spec: Unless specified, the “msg” in the PRINT function should always be “Hello world from <process_name>!”
+                bp.args = {"Hello world from " + processName + "!"}; 
                 break;
             case 1: 
                 bp.op = OpCode::DECLARE; 
@@ -79,7 +85,7 @@ private:
                 // Generates a multi-instruction "set/array" loop body
                 int bodySize = 1 + (rand() % 3); 
                 for (int i = 0; i < bodySize; ++i) {
-                    bp.loopBody.push_back(generateSingleBlueprint(currentDepth + 1));
+                    bp.loopBody.push_back(generateSingleBlueprint(currentDepth + 1, processName));
                 }
                 break;
             }
@@ -102,7 +108,7 @@ private:
 
 public:
     // Main factory method called once by Process constructor
-    static std::vector<Instruction> createProgram(int minIns, int maxIns) {
+    static std::vector<Instruction> createProgram(const std::string& processName, int minIns, int maxIns) {
         bool generationValid = false;
         std::vector<Instruction> finalProgram;
 
@@ -113,7 +119,7 @@ public:
             // Generate instructions sequentially at the top level (depth = 1)
             int initialItems = minIns; 
             for (int i = 0; i < initialItems; ++i) {
-                InstructionBlueprint bp = generateSingleBlueprint(1);
+                InstructionBlueprint bp = generateSingleBlueprint(1, processName);
                 totalProjectedSize += bp.calculateFlatSize();
                 temporaryBatch.push_back(bp);
             }
