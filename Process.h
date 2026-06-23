@@ -49,6 +49,14 @@ private:
     unsigned int sleepTimer = 0;// Handles process sleep cycles
     ProcessState state = ProcessState::READY; // Current scheduling lifecycle state
 
+    // DELAYS PER EXEC
+    // You know i could have min and max be a static variable initialized on startup as well
+    // Oh Well too late
+    // Loaded once from config.txt during the "initialize" command
+    inline static unsigned int globalDelayPerExec = 0; 
+    // Tracks how many more cycles this specific process must busy-wait on a core
+    unsigned int currentDelayCounter = 0;
+
     // Check if String args is number or variable
     // If Variable, return the value in symbol table or o
     // if Doesnt exist in symbol table, declare as 0
@@ -171,20 +179,28 @@ public:
     // Call this to execute one line of code
     // Wrapper for execute instruction
     void runCycle() {
-        //Check if Process if Asleep or Over
+        //Check if Process if Asleep or Over 
         if (finished || state == ProcessState::FINISHED || sleepTimer > 0 || state == ProcessState::WAITING) return;
         if (currentInstruction >= totalInstructions) return;
+        // New Check if process is being delayed
+        if (currentDelayCounter > 0) {
+            currentDelayCounter--;
+            return; // Burn this CPU cycle doing absolutely nothing
+        }
 
         // Route the current active line to the execution handler
         executeInstruction(instructions[currentInstruction]);
 
         currentInstruction++;
-        dateLastInstruction = std::chrono::system_clock::now();
+        dateLastInstruction = std::chrono::system_clock::now();  
+        currentDelayCounter = globalDelayPerExec; // If globalDelayPerExec is 0, this sets it to 0, running 1 instruction per cycle perfectly.
 
         if (currentInstruction >= static_cast<int>(instructions.size())) {
             finished = true;
             state = ProcessState::FINISHED;
         }
+
+        
     }
 
     void decrementSleep() { 
@@ -214,6 +230,11 @@ public:
     // Checks both the legacy boolean and the localized enum state safely
     bool isFinished() const { return finished || state == ProcessState::FINISHED; }
     int getAssignedCore() const { return assignedCore; }
+
+    // Public setter called by the configuration parser during initialization
+    static void setGlobalDelayPerExec(unsigned int delay) {
+        globalDelayPerExec = delay;
+    }
 
     // Converts enum to human-readable text for visual terminal dumps
     std::string getStateString() const {

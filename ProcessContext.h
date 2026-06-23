@@ -24,6 +24,8 @@ struct InstructionBlueprint {
     }
 };
 
+//DEPRECATED
+
 /*
 This class contains the context and code necesarry for executing Instruction Lines
 

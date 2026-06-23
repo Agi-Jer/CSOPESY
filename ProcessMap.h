@@ -7,6 +7,14 @@
 #include <mutex> // Included for multi-threaded safety
 #include "Process.h"
 
+/*
+Unordered map of all processes
+
+all processes begin and stay here
+
+other classes simply traded in pids and reference this static class instead
+*/
+
 class ProcessMap {
 private:
     // Global static registry holding all active or finished processes
