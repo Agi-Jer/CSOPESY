@@ -1,0 +1,7 @@
+num-cpu 10
+scheduler "rr"
+quantum-cycles 10
+batch-process-freq 10
+min-ins 200
+max-ins 300
+delay-per-exec 0

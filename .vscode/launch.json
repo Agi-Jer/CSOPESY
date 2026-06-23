@@ -2,16 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run in Ptyxis",
-            "type": "cppdbg",
+            "name": "Compile and Run Emulator",
+            "type": "mock",
             "request": "launch",
-            // Points to a dummy binary to satisfy VS Code while running our custom task
-            "program": "/bin/true",
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "run-in-ptyxis",
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "externalConsole": false
+            "program": "${workspaceFolder}/main",
+            "stopOnEntry": false,
+            "preLaunchTask": "run-in-ptyxis"
         }
     ]
 }

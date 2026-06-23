@@ -50,7 +50,7 @@ private:
     ProcessState state = ProcessState::READY; // Current scheduling lifecycle state
 
     //PROCESS SMI
-    std::string screenLogBuffer;    //Log Buffer for process-smi
+    std::vector<std::string> screenLogBuffer;    //Log Buffer for process-smi
 
     // DELAYS PER EXEC
     // You know i could have min and max be a static variable initialized on startup as well
@@ -259,6 +259,10 @@ public:
             case ProcessState::FINISHED: return "FINISHED";
         }
         return "UNKNOWN";
+    }
+
+    const std::vector<std::string>& getScreenLogBuffer() const {
+        return screenLogBuffer;
     }
 
     std::string getCreationTime() const { return formatTimestamp(dateCreated); }

@@ -8,8 +8,7 @@
             "args": [
                 "-g",
                 "-std=c++20", 
-                "${workspaceFolder}/main.cpp",
-                "-lncurses",
+                "${workspaceFolder}/*.cpp",
                 "-pthread",
                 "-o",
                 "${workspaceFolder}/main"
@@ -31,7 +30,7 @@
                 "--",
                 "bash",
                 "-c",
-                "${workspaceFolder}/main; echo; read -p 'Press Enter to close...'"
+                "cd '${workspaceFolder}' && ./main; echo; read -p 'Press Enter to close...'"
             ],
             "problemMatcher": []
         }
