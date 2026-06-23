@@ -8,16 +8,18 @@
 #include <chrono>
 #include <iomanip>
 #include <ctime>
+#include "Instruction.h"
+#include "SymbolTable.h"
+#include "GenerateProcessInstructions.h" // Include factory class
 
-// Dummy structure for Instruction assumed from your context
-struct Instruction {
-    std::string commandType;
-    std::string argument;    
-};
+/*
+Abstraction for Process
 
+Handles all the necessary load for keeping track of processing time and
+running the low level logic for processing the instructions
+*/
 class Process {
 private:
-    // Static counter initialized to 0 to manage auto-incrementing process IDs
     inline static int globalPidCounter = 0;
 
     int pid;                    // Unique process ID
@@ -34,56 +36,37 @@ private:
     std::chrono::system_clock::time_point dateCreated;
     std::chrono::system_clock::time_point dateLastInstruction;
 
-    // Helper method to get any time point formatted as (MM/DD/YYYY HH:MM:SSAM/PM)
+    // RUNTIME ENGINE FIELDS
+    SymbolTable sTable;         // Private memory bank for THIS process context
+    unsigned int sleepTimer = 0;// Handles process sleep cycles
+    const std::vector<std::string> VAR_POOL = {"x", "y", "z", "i", "j", "k"};
+
+    // Internal helper to get a safe value (literal or variable)
+    int32_t resolveValue(const std::string& token) {
+        if (sTable.exists(token)) {
+            return std::get<unsigned short>(sTable.getValue(token));
+        }
+        for (const auto& var : VAR_POOL) {
+            if (token == var) {
+                sTable.insert(token, "unsigned short", "0");
+                return 0;
+            }
+        }
+        return std::stoi(token);
+    }
+
     std::string formatTimestamp(const std::chrono::system_clock::time_point& tp) const {
         std::time_t currentTime = std::chrono::system_clock::to_time_t(tp);
         std::tm* localTime = std::localtime(&currentTime);
         if (!localTime) return "(00/00/0000 00:00:00AM)";
 
         char buffer[40];
-        // Format the core time units: %m = Month, %d = Day, %Y = Year, %I = 12-hour clock, %M = Minute, %S = Second, %p = AM/PM
         std::strftime(buffer, sizeof(buffer), "(%m/%d/%Y %I:%M:%S%p)", localTime);
         return std::string(buffer);
     }
 
-    // Handles the execution log file creation and writing
-    void logPrintCommand(const std::string& message) {
-        std::string filename = name + ".txt";
-        
-        // Check if file already exists to decide whether to write the header headers
-        std::ifstream checkFile(filename);
-        bool isNewFile = !checkFile.good();
-        checkFile.close();
-
-        // Open in append mode
-        std::ofstream logFile(filename, std::ios::app);
-        
-        if (logFile.is_open()) {
-            if (isNewFile) {
-                logFile << "Process name: " << name << "\n";
-                logFile << "Logs:\n\n";
-            }
-            
-            // Log matching the exact structure from your screenshot using the instruction time
-            logFile << formatTimestamp(dateLastInstruction) << " Core:" << assignedCore 
-                    << " \"" << message << "\"\n";
-            
-            logFile.close();
-        } else {
-            std::cerr << "Error: Could not open file " << filename << " for writing.\n";
-        }
-    }
-
-    // Instruction interpreter
-    void run(const Instruction& instr) {
-        if (instr.commandType == "PRINT") {
-            logPrintCommand(instr.argument);
-        }
-        // Handle other commands here in the future
-    }
-
 public:
-    // Safe default constructor for creating clean display/extraction containers without ticking the counter
+    // Safe default constructor for display slots
     Process() 
         : pid(-1), name("unassigned"), assignedCore(-1), finished(false), 
           currentInstruction(0), totalInstructions(0) {
@@ -91,51 +74,81 @@ public:
         dateLastInstruction = dateCreated;
     }
 
-    // New constructor handling auto-increment PID, targeted string name naming conventions, and automatic vector padding
-    Process(std::string commandType, int totalInst = 100) 
-        : currentInstruction(0), totalInstructions(totalInst), finished(false), assignedCore(-1) {
+    // Standard constructor managing random generation ranges
+    Process(std::string processName, int minIns, int maxIns)
+        : pid(globalPidCounter++), name(processName), assignedCore(-1), finished(false),
+          currentInstruction(0) {
         
-        // 1. Assign the current static ID index value and increment it for the next process
-        this->pid = globalPidCounter++;
+        // Call the generation offshoot factory once to build the instruction list
+        instructions = GenerateProcessInstructions::createProgram(minIns, maxIns);
 
-        // 2. Set process naming conditionally based on command type string
-        if (commandType == "PRINT") {
-            this->name = "screen_" + std::to_string(this->pid);
-        } else {
-            this->name = "process_" + std::to_string(this->pid);
-        }
-
-        // 3. Pre-fill the instruction vector with totalInst entries of this commandType
-        for (int i = 0; i < totalInstructions; ++i) {
-            Instruction instr;
-            instr.commandType = commandType;
-            // Setup a default print message using its own programmatic process title
-            instr.argument = "Hello world from " + this->name + "!";
-            this->instructions.push_back(instr);
-        }
-
-        // 4. Set the creation baseline timestamps
+        totalInstructions = static_cast<int>(instructions.size());
         dateCreated = std::chrono::system_clock::now();
         dateLastInstruction = dateCreated;
     }
 
-    // Simulation for processing one instruction line
-    void executeInstruction() {
-        if (!finished) {
-            // Update timestamp precisely when the execution begins
-            dateLastInstruction = std::chrono::system_clock::now();
+    // Core runner executed inside your processing ticks
+    void runCycle() {
+        if (finished || sleepTimer > 0) return;
+        if (currentInstruction >= static_cast<int>(instructions.size())) return;
 
-            // Execute current instruction
-            run(instructions[currentInstruction]);
+        const Instruction& current = instructions[currentInstruction];
+        OpCode op = current.getOpCode();
+        const auto& args = current.getArgs();
 
-            currentInstruction++;
+        switch (op) {
+            case OpCode::ADD: {
+                if (!sTable.exists(args[0])) {
+                    sTable.insert(args[0], "unsigned short", "0");
+                }
+                int32_t val2 = resolveValue(args[1]);
+                int32_t val3 = resolveValue(args[2]);
+                int32_t result = val2 + val3;
+                
+                if (result > 65535) result = 65535;
+                if (result < 0) result = 0;
 
-            // Check if process is done
-            if (currentInstruction >= totalInstructions) {
-                finished = true;
+                sTable.update(args[0], std::to_string(result));
+                break;
+            }
+            case OpCode::SUBTRACT: {
+                if (!sTable.exists(args[0])) {
+                    sTable.insert(args[0], "unsigned short", "0");
+                }
+                int32_t val2 = resolveValue(args[1]);
+                int32_t val3 = resolveValue(args[2]);
+                int32_t result = val2 - val3;
+
+                if (result > 65535) result = 65535;
+                if (result < 0) result = 0;
+
+                sTable.update(args[0], std::to_string(result));
+                break;
+            }
+            case OpCode::SLEEP: {
+                sleepTimer = std::stoi(args[0]);
+                break;
+            }
+            case OpCode::DECLARE: {
+                sTable.insert(args[0], "unsigned short", args[1]);
+                break;
+            }
+            case OpCode::PRINT: {
+                // Hook screen buffer logs here
+                break;
             }
         }
+
+        currentInstruction++;
+        dateLastInstruction = std::chrono::system_clock::now();
+
+        if (currentInstruction >= static_cast<int>(instructions.size())) {
+            finished = true;
+        }
     }
+
+    void decrementSleep() { if (sleepTimer > 0) sleepTimer--; }
+    bool isSleeping() const { return sleepTimer > 0; }
 
     // Setters & Getters
     void setAssignedCore(int coreId) { this->assignedCore = coreId; }
@@ -146,14 +159,8 @@ public:
     bool isFinished() const { return finished; }
     int getAssignedCore() const { return assignedCore; }
 
-    // Human-readable string timestamps exposed for your UI Screen class
-    std::string getCreationTime() const { 
-        return formatTimestamp(dateCreated); 
-    }
-    
-    std::string getLastInstructionTime() const { 
-        return formatTimestamp(dateLastInstruction); 
-    }
+    std::string getCreationTime() const { return formatTimestamp(dateCreated); }
+    std::string getLastInstructionTime() const { return formatTimestamp(dateLastInstruction); }
 };
 
 #endif

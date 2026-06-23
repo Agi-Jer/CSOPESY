@@ -6,6 +6,14 @@
 #include <mutex>
 #include "Process.h" 
 
+/*
+Abstraction for Global RQ
+
+No per-core RQ
+
+Everything is STATIC to act as a psudo global access
+*/
+
 class RQ {
 private:
     inline static std::queue<Process> rQueue; 
