@@ -1,105 +1,98 @@
 #ifndef SCREEN_H
 #define SCREEN_H
 
-#include <ncurses.h>
-#include <vector>
+#include <iostream>
 #include <string>
-#include "CPU.h"
-#include "RQ.h"
+#include <vector>
+#include "ProcessMap.h"
 #include "Process.h"
-
-/*
-Handles all the scren processing logic
-
-e.g. Screen -ls, Cpu Utilization
-
-Everything is handled statically
-All data is gathered and handled at time of UI calling
-*/
+#include "RQ.h"
 
 class Screen {
 private:
-    // Initializes ncurses properties safely for a brief snapshot view
-    static void initialize() {
-        initscr();
-        cbreak();
-        noecho();
-        curs_set(0); // Hide the terminal cursor
-        keypad(stdscr, TRUE);
-    }
+    // Helper to print the localized process information block
+    static void renderProcessSMI(Process* proc) {
+        if (proc == nullptr) return;
 
-    // Restores standard terminal properties on exit so std::cin works again
-    static void finalize() {
-        endwin();
+        std::cout << "\nProcess name: " << proc->getName() << "\n";
+        std::cout << "ID: " << proc->getPid() << "\n";
+        std::cout << "Logs:\n";
+
+        // Fetch and print out chronological screen print entries
+        const auto& logs = proc->getScreenLogBuffer();
+        for (const auto& logLine : logs) {
+            std::cout << logLine << "\n";
+        }
+
+        // Spec & Mockup Match: If finished, print "Finished!" and skip line numbers entirely
+        if (proc->isFinished()) {
+            std::cout << "\nFinished!\n";
+            return;
+        }
+
+        // Only prints if the process is actively running or waiting
+        std::cout << "\nCurrent instruction line: " << proc->getCurrentInstruction() << "\n";
+        std::cout << "Lines of code: " << proc->getTotalInstructions() << "\n";
     }
 
 public:
-    // Takes a snapshot, displays it, and blocks until a key is pressed
-    static void displayScreenLS(const CPU& cpu) {
-        // 1. Boot up ncurses window layer
-        initialize();
-        erase();
+    Screen() = delete; // Pure static UI component
 
-        int currentRow = 0;
-        
-        // --- 1. Header Separation Line ---
-        mvprintw(currentRow++, 0, "---------------------------------------------------------");
-        mvprintw(currentRow++, 0, "Running processes:");
+    // OVERLOAD 1: Standard Re-attach (Equivalent to screen -r)
+    static void enterProcessScreen(const std::string& processName) {
+        Process* proc = ProcessMap::getProcessByName(processName);
 
-        // --- 2. Render Active Running Processes ---
-        std::vector<Process> running = cpu.getRunningProcesses();
-        for (const auto& p : running) {
-            // Replicating column-width spacing matching your screenshots exactly:
-            // Name at x=0, Timestamp at x=12, Core label at x=44, Progress fraction at x=56
-            mvprintw(currentRow, 0, "%s", p.getName().c_str());
-            mvprintw(currentRow, 12, "%s", p.getCreationTime().c_str());
-            mvprintw(currentRow, 44, "Core: %d", p.getAssignedCore());
-            mvprintw(currentRow, 56, "%d / %d", p.getCurrentInstruction(), p.getTotalInstructions());
-            currentRow++;
+        // Guard: Process doesn't exist at all in the registry
+        if (proc == nullptr) {
+            std::cout << "Process " << processName << " not found.\n";
+            return;
         }
 
-        currentRow++; // Spacing layout gap
-
-        // --- 3. Render Finished Processes Section ---
-        mvprintw(currentRow++, 0, "Finished processes:");
-        
-        std::vector<Process> finished = RQ::getFinishedProcesses();
-        size_t totalFinished = finished.size();
-
-        // Determine slice boundaries for filtering down to the last 10 elements
-        size_t startIdx = 0;
-        if (totalFinished > 10) {
-            startIdx = totalFinished - 10;
+        // Guard: Process exists but has already finished (Strict spec match)
+        if (proc->isFinished()) {
+            std::cout << "Process " << processName << " not found.\n";
+            return;
         }
 
-        // Loop and print only the last 10 entries from the vector snapshot
-        for (size_t i = startIdx; i < totalFinished; ++i) {
-            const auto& p = finished[i];
-            mvprintw(currentRow, 0, "%s", p.getName().c_str());
-            mvprintw(currentRow, 12, "%s", p.getCreationTime().c_str());
-            mvprintw(currentRow, 44, "Finished");
-            mvprintw(currentRow, 56, "%d / %d", p.getTotalInstructions(), p.getTotalInstructions());
-            currentRow++;
+        //My ass is on Linux
+        std::system("clear");
+
+        renderProcessSMI(proc);
+        std::string subInput; //For input loop
+
+        // New loop bound completely inside new isolated screen space
+        while (true) {
+            std::cout << "\nroot:\\> "; //I should probably switch from the example
+            std::getline(std::cin, subInput);
+
+            if (subInput == "process-smi") {
+                renderProcessSMI(proc);
+            } 
+            else if (subInput == "exit") {
+                break;
+            } 
+            else if (!subInput.empty()) {
+                std::cout << "Command not recognized within process screen context.\n";
+            }
+        }
+    }
+
+    // OVERLOAD 2: Spawn & Attach (Equivalent to screen -s)
+    static void enterProcessScreen(const std::string& processName, int minIns, int maxIns) {
+        // Check if a process with this name already exists to prevent duplication collisions
+        if (ProcessMap::getProcessByName(processName) != nullptr) {
+            std::cout << "Error: A process named '" << processName << "' already exists.\n";
+            return;
         }
 
-        // --- 4. Overflow Cut-off Indicator Check ---
-        if (totalFinished > 10) {
-            mvprintw(currentRow++, 0, "... [More than 10 finished processes. Older records cut off] ...");
-        }
+        // Call the function from ProcessMap to instantiate and register it
+        int newPid = ProcessMap::createNewProcess(processName, minIns, maxIns);
 
-        // --- 5. Footer Separation Line ---
-        mvprintw(currentRow++, 0, "---------------------------------------------------------");
-        mvprintw(currentRow++, 0, "Press any key to return to console prompt...");
+        // Put the new process into the global Ready Queue so the CPU starts crunching it
+        RQ::addToReady(newPid);
 
-        // Refresh window buffer to display changes
-        refresh();
-
-        // 2. BLOCKING CHECK: Safely wait right here until user hits any key
-        nodelay(stdscr, FALSE); // Force getch to wait synchronously
-        getch(); 
-
-        // 3. Deconstruct ncurses buffer screen and drop cleanly back to standard CLI terminal
-        finalize();
+        // Fall back directly to the original function to clear the screen and start the loop
+        enterProcessScreen(processName);
     }
 };
 
