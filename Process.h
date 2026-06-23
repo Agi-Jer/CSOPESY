@@ -162,6 +162,11 @@ public:
         dateLastInstruction = dateCreated;
     }
 
+    // Overloaded constructor that derives the name automatically using the next PID
+    Process(int minIns, int maxIns) 
+        : Process("process_" + std::to_string(globalPidCounter), minIns, maxIns) {
+    }
+
     // Main function that begin actually running the instructions
     // Call this to execute one line of code
     // Wrapper for execute instruction
