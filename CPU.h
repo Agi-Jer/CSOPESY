@@ -68,6 +68,9 @@ private:
             // --- CPU CYCLE WORK HAPPENS HERE ---
             cycleCount++;
             
+            // Ticks down the timers for any processes currently blocked/sleeping
+            manageWaitingQueue();
+            
             // Instantly unblocks and wakes up any Core threads waiting for this cycle
             cycleCount.notify_all(); 
             // ------------------------------------
