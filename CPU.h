@@ -30,6 +30,31 @@ private:
     // Updated to an atomic type so cores can sleep on it cleanly
     std::atomic<unsigned long long> cycleCount; //CPU cycle tracker
 
+    // Iterates through all currently sleeping processes and decrements their timers
+    void manageWaitingQueue() {
+        // Grab a snapshot copy of the waiting PIDs to iterate safely
+        std::vector<int> waitingPids = RQ::getWaitingProcesses();
+
+        for (int pid : waitingPids) {
+            //Get process from map
+            Process* proc = ProcessMap::getProcess(pid);
+            if (proc != nullptr) {
+                // Decrement the local sleep counter inside the process
+                proc->decrementSleep();
+
+                // If the process woke up and changed its state back to READY
+                if (!proc->isSleeping()) {
+                    // Update global queues: remove from waiting list, push to ready loop
+                    RQ::removeFromWaiting(pid);
+                    RQ::addToReady(pid);
+                }
+            } else {
+                // Safety cleanup: If a process somehow vanished from memory, clear it out
+                RQ::removeFromWaiting(pid);
+            }
+        }
+    }
+
     // background cpu cycle thread
     void runCPULoop() {
         // ~30 cycles per second (approx 33.33ms per cycle)
@@ -86,22 +111,6 @@ public:
     // Getter to check the current cycle count statically or dynamically
     unsigned long long getCycleCount() const {
         return cycleCount.load();
-    }
-
-    // Aggregates and returns a vector containing copies of only the active running processes across all cores
-    // For UI management (e.g. Screen -ls)
-    std::vector<Process> getRunningProcesses() const {
-        std::vector<Process> runningProcesses;
-
-        // Loop through each core pointer to pull active process information thread-safely
-        for (const auto& core : cores) {
-            Process p; // Changed '.' to '->' since elements are pointers
-            if (core->getActiveProcessCopy(p)) { 
-                runningProcesses.push_back(p);
-            }
-        }
-
-        return runningProcesses;
     }
 };
 

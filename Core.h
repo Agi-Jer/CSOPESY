@@ -6,10 +6,9 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
-#include <mutex> // Added for thread safety when CPU reads the process
-#include <memory>
 #include "Process.h"
 #include "RQ.h"
+#include "ProcessMap.h" // Needed to perform the initial PID lookup
 
 /*
 The Core class is an abstraction of a cpu core
@@ -27,7 +26,11 @@ class Core {
 private:
     int coreId; //Core Id starts from 0 counting up
     SchedulerType type; // Fast enum type tracking instead of strings
-    std::unique_ptr<Process> currentProcess; //Process its currently handling in core
+    
+    // Tracking fields matching the new ProcessMap architecture
+    int currentPid;                          // Holds the ID of the assigned process (-1 if idle)
+    Process* currentProcess;                 // Performance Optimization: Caches pointer locally
+    
     bool holdsProcess; //Bool if core is currently handling a process
     unsigned int quantumCycle; //Quantum cycle for Round Robin
     unsigned int trackQCycle; //keeps track of the current quantum cycle for the RR logic
@@ -40,36 +43,56 @@ private:
     const std::atomic<unsigned long long>& globalCycleRef; 
     unsigned long long currCycle; 
 
-    // Added to protect currentProcess and holdsProcess from being modified 
-    // by this thread while the CPU thread is trying to read them for the UI
-    mutable std::mutex coreMutex; 
-
-
     // First-Come, First-Served scheduling implementation
     void fcfs() {
         // FCFS Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
-            Process poppedProcess; // Temporary container for tryPopReady
-            if (RQ::tryPopReady(poppedProcess)) {
-                
-                // Allocate the raw process onto the heap safely!
-                currentProcess = std::make_unique<Process>(poppedProcess);
-                
+            int poppedPid = -1; // Temporary container for tryPopReady
+            if (RQ::tryPopReady(poppedPid)) {
+                currentPid = poppedPid;
                 holdsProcess = true;
-                currentProcess->setAssignedCore(coreId); // Use -> instead of .
+                
+                // Fetch and cache the direct pointer once during acquisition
+                currentProcess = ProcessMap::getProcess(currentPid);
+                if (currentProcess != nullptr) {
+                    currentProcess->setRunning();
+                    currentProcess->setAssignedCore(coreId);
+                }
+                
+                // Mirror onto the global running registry tracking system
+                RQ::addToRunning(currentPid);
             }
         }
 
-        // Execution of Instruction
+        // Execution of Instruction using the cached pointer directly
         if (holdsProcess && currentProcess != nullptr) {
-            currentProcess->executeInstruction();
+            // runCycle handles execution routing, internal clocks, and auto-finishing flags
+            currentProcess->runCycle();
 
-            if (currentProcess->isFinished()) { 
-                RQ::addToFinished(*currentProcess);
-                currentProcess.reset();
-                holdsProcess = false; 
-                //std::cout << "Core " << coreId << " finished Process " << currentProcess.getPid() << " on Cycle " << currCycle << std::endl;
+            // Step A: Check if the instruction placed the process in a WAITING state (e.g., SLEEP instruction)
+            if (currentProcess->isSleeping()) {
+                RQ::removeFromRunning(currentPid);
+                RQ::addToWaiting(currentPid);
+                
+                // Reset fields completely to signal core availability
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false;
             }
+            // Step B: Check if the process naturally exhausted its program lines
+            else if (currentProcess->isFinished()) { 
+                RQ::removeFromRunning(currentPid);
+                RQ::addToFinished(currentPid);
+                
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false; 
+            }
+        } else if (holdsProcess) {
+            // Fallback safety case: If core thinks it has work but pointer is null, reset flags
+            currentPid = -1;
+            currentProcess = nullptr;
+            holdsProcess = false;
         }
     }
 
@@ -77,46 +100,72 @@ private:
     void rr() {
         // RR Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
-            Process poppedProcess; // Temporary container for tryPopReady
-            if (RQ::tryPopReady(poppedProcess)) {
-                
-                // Allocate the raw process onto the heap safely!
-                currentProcess = std::make_unique<Process>(poppedProcess);
-                
+            int poppedPid = -1; // Temporary container for tryPopReady
+            if (RQ::tryPopReady(poppedPid)) {
+                currentPid = poppedPid;
                 holdsProcess = true;
-                currentProcess->setAssignedCore(coreId); // Use -> instead of .
+                
+                // Fetch and cache the direct pointer once during acquisition
+                currentProcess = ProcessMap::getProcess(currentPid);
+                if (currentProcess != nullptr) {
+                    currentProcess->setRunning();
+                    currentProcess->setAssignedCore(coreId);
+                }
+                
+                // Mirror onto the global running registry tracking system
+                RQ::addToRunning(currentPid);
                 
                 // Reset the quantum tracker for this freshly scheduled process
                 trackQCycle = 0; 
             }
         }
 
-        // Execution of Instruction
+        // Execution of Instruction using the cached pointer directly
         if (holdsProcess && currentProcess != nullptr) {
-            currentProcess->executeInstruction();
+            // runCycle handles execution routing, internal clocks, and auto-finishing flags
+            currentProcess->runCycle();
             
             // Advance our perpetual quantum clock tracker by 1 cycle
             trackQCycle++;
 
-            // Scenario A: The process naturally finished its workload during this cycle
-            if (currentProcess->isFinished()) { 
-                RQ::addToFinished(*currentProcess);
-                currentProcess.reset();
-                holdsProcess = false; 
-                trackQCycle = 0; // Reset tracker for the next process allocation
-                //std::cout << "Core " << coreId << " finished Process " << currentProcess->getPid() << " on Cycle " << currCycle << std::endl;
+            // Scenario A: The process hit a SLEEP instruction and went into a WAITING state
+            if (currentProcess->isSleeping()) {
+                RQ::removeFromRunning(currentPid);
+                RQ::addToWaiting(currentPid);
+                
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false;
+                trackQCycle = 0;
             }
-            // Scenario B: Process is not finished, but the time slice has expired!
+            // Scenario B: The process naturally finished its workload during this cycle
+            else if (currentProcess->isFinished()) { 
+                RQ::removeFromRunning(currentPid);
+                RQ::addToFinished(currentPid);
+                
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false; 
+                trackQCycle = 0; 
+            }
+            // Scenario C: Process is not finished or waiting, but the time slice has expired!
             else if (trackQCycle >= quantumCycle) {
-                // Copying data to prevent other Core threads from pulling from RQ 
-                // at the same time this thread removes it from memory
-                Process preemptedProcess = *currentProcess; 
-                currentProcess.reset();                     
+                currentProcess->setReady(); // Set state back to READY before sending back to queue
+
+                RQ::removeFromRunning(currentPid);                     
+                RQ::addToReady(currentPid);           
+                
+                currentPid = -1;                     
+                currentProcess = nullptr;
                 holdsProcess = false;
                 trackQCycle = 0; 
-
-                RQ::addToReady(preemptedProcess);           
             }
+        } else if (holdsProcess) {
+            // Fallback safety case: If core thinks it has work but pointer is null, reset flags
+            currentPid = -1;
+            currentProcess = nullptr;
+            holdsProcess = false;
+            trackQCycle = 0;
         }
     }
 
@@ -139,28 +188,22 @@ private:
             // Catch up to the freshly updated CPU cycle
             currCycle = globalCycleRef.load();
 
-            // Scope block to lock variables during modification
-            {
-                std::lock_guard<std::mutex> lock(coreMutex);
-
-                // Dynamically route workloads via rapid assembly-friendly integer checks
-                switch (type) {
-                    case SchedulerType::FCFS:
-                        fcfs();
-                        break;
-                    case SchedulerType::ROUND_ROBIN:
-                        rr();
-                        break;
-                }
-                
-            } // Mutex automatically unlocks here
+            // Dynamically route workloads via rapid assembly-friendly integer checks
+            switch (type) {
+                case SchedulerType::FCFS:
+                    fcfs();
+                    break;
+                case SchedulerType::ROUND_ROBIN:
+                    rr();
+                    break;
+            }
         }
     }
 
 public:
     // Make a thread on construction
     Core(int id, std::atomic<bool>& cpuRunFlag, const std::atomic<unsigned long long>& cpuCycle, std::string coreType = "fcfs", unsigned int quantumCycle = 0) 
-        : coreId(id), currentProcess(nullptr), holdsProcess(false),
+        : coreId(id), currentPid(-1), currentProcess(nullptr), holdsProcess(false),
           quantumCycle(quantumCycle), trackQCycle(0),
           cpuRunningRef(cpuRunFlag), globalCycleRef(cpuCycle), currCycle(0) {
         
@@ -183,28 +226,10 @@ public:
 
     //Getters
     int getCoreId() const { return coreId; }
-    // Check if the core is currently busy
+    
+    // Check if the core is currently busy (Now safely thread-safe without explicit lock)
     bool isHoldingProcess() const { 
-        std::lock_guard<std::mutex> lock(coreMutex);
         return holdsProcess && (currentProcess != nullptr); 
-    }
-    // Read the process currently assigned to this core
-    const Process& getCurrentProcess() const { 
-        std::lock_guard<std::mutex> lock(coreMutex);
-        return *currentProcess;
-    }
-
-    // Thread-safe method for the CPU to extract an active process copy safely
-    // This is meant for reading the process (e.g. Screen -ls)
-    bool getActiveProcessCopy(Process& outProcess) const {
-        std::lock_guard<std::mutex> lock(coreMutex);
-        
-        // CRITICAL FIX: Only copy if the pointer is NOT null!
-        if (holdsProcess && currentProcess != nullptr) {
-            outProcess = *currentProcess; // Dereference the pointer safely
-            return true;
-        }
-        return false;
     }
 };
 
