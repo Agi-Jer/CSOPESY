@@ -30,6 +30,11 @@ class GenerateProcessInstructions {
 private:
     inline static const std::vector<std::string> VAR_POOL = {"x", "y", "z", "i", "j", "k"};
 
+    // Helper to randomly select between a variable (30% chance) or a number literal (70% chance)
+    static std::string selectArgRandom(const std::string& varToken, const std::string& numToken) {
+        return (rand() % 100 < 30) ? varToken : numToken;
+    }
+
     // Unified recursive blueprint generator (Handles all 6 opcodes cleanly)
     static InstructionBlueprint generateSingleBlueprint(int currentDepth) {
         InstructionBlueprint bp;
@@ -43,7 +48,7 @@ private:
         std::string v2 = VAR_POOL[rand() % VAR_POOL.size()];
         std::string v3 = VAR_POOL[rand() % VAR_POOL.size()];
         std::string randVal = std::to_string(rand() % 50);
-
+        
         switch (choice) {
             case 0: 
                 bp.op = OpCode::PRINT; 
@@ -55,11 +60,13 @@ private:
                 break;
             case 2: 
                 bp.op = OpCode::ADD; 
-                bp.args = {v1, v2, randVal}; 
+                // Target is always a variable, operands are randomized 30/70
+                bp.args = {v1, selectArgRandomly(v2, randVal), selectArgRandomly(v3, randVal)}; 
                 break;
             case 3: 
                 bp.op = OpCode::SUBTRACT; 
-                bp.args = {v1, v2, v3}; 
+                // Target is always a variable, operands are randomized 30/70
+                bp.args = {v1, selectArgRandomly(v2, randVal), selectArgRandomly(v3, randVal)}; 
                 break;
             case 4: 
                 bp.op = OpCode::SLEEP; 
@@ -121,6 +128,16 @@ public:
             }
         }
         return finalProgram;
+    }
+
+    // Public static helper to check if a token belongs to the valid variable pool
+    static bool isTokenInVariablePool(const std::string& token) {
+        for (const auto& var : VAR_POOL) {
+            if (token == var) {
+                return true;
+            }
+        }
+        return false;
     }
 };
 
