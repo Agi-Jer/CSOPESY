@@ -5,29 +5,29 @@
 #include "Screen.h"
 #include "Report.h"
 #include "Process.h"
+#include "BatchGeneration.h"
 
 // Unified header banner showcasing the application header details and ALL configurations
 void showBanner(int numCores, const std::string& scheduler, int quantum, int batchFreq, int minIns, int maxIns, unsigned int delayPerExec) {
-    std::cout << " _,.----.     ,-,--.    _,.---._        _ __        ,----.    ,-,--.                  \n";
-    std::cout << ".' .' -   \\ ,-.'-  _\\ ,-.' , -  `.    .-`.' ,`.  ,-.--` , \\ ,-.'-  _\\ ,--.-.  .-,--.  \n";
-    std::cout << "/==/  ,  ,-'/==/_ ,_.'/==/_,  ,  - \\ /==/, -   \\|==|-  _.-`/==/_ ,_.'/==/- / /=/_ /  \n";
-    std::cout << "|==|-   |  .\\==\\  \\  |==|   .=.     |==| _ .=. ||==|   `.-.\\==\\  \\   \\==\\, \\/=/. /   \n";
-    std::cout << "|==|_   `-' \\\\==\\ -\\ |==|_ : ;=:  - |==| , '=',/==/_ ,    / \\==\\ -\\   \\==\\  \\/ -/    \n";
-    std::cout << "|==|   _  , |_\\==\\ ,\\|==| , '='     |==|-  '..'|==|    .-'  _\\==\\ ,\\   |==|  ,_/     \n";
-    std::cout << "\\==\\.       /==/\\/ _ |\\==\\ -    ,_ /|==|,  |   |==|_  ,`-._/==/\\/ _ |  \\==\\-, /      \n";
-    std::cout << " `-.`.___.-'\\==\\ - , / '.='. -   .' /==/ - |   /==/ ,     /\\==\\ - , /  /==/._/       \n";
-    std::cout << "             `--`---'    `--`--''    `--`---'   `--`-----``  `--`---'   `--`-`        \n";
+    std::cout << " ▄████████  ▄████████    ▄██████▄     ▄███████▄    ▄████████    ▄████████   ▄██   ▄   \n";
+    std::cout << "███    ███  ███    ███   ███    ███   ███    ███   ███    ███   ███    ███  ███   ██▄ \n";
+    std::cout << "███    █▀   ███    █▀    ███    ███   ███    ███   ███    █▀    ███    █▀   ███▄▄▄███ \n";
+    std::cout << "███         ███          ███    ███   ███    ███  ▄███▄▄▄       ███         ▀▀▀▀▀▀███ \n";
+    std::cout << "███        ▀███████████  ███    ███  ▀█████████▀ ▀▀███▀▀▀     ▀███████████  ▄██   ███ \n";
+    std::cout << "███    █▄           ███  ███    ███   ███          ███    █▄           ███  ███   ███ \n";
+    std::cout << "███    ███    ▄█    ███  ███    ███   ███          ███    ███    ▄█    ███  ███   ███ \n";
+    std::cout << "████████▀   ▄████████▀    ▀██████▀   ▄████▀        ██████████  ▄████████▀    ▀█████▀  \n";
     std::cout << "--------------------------------------------------------------------------------------\n";
     std::cout << "Welcome to CSOPESY Emulator!\n\n";
     std::cout << "Developers: Aglugub, Jerome Andrei C.\n";
     std::cout << "SYSTEM CONFIGURATION:\n";
-    std::cout << "  [num-cpu]            Number of Cores:   " << numCores << "\n";
-    std::cout << "  [scheduler]          Scheduling Algo:   " << scheduler << "\n";
-    std::cout << "  [quantum-cycles]     Quantum Time Slice: " << quantum << " cycle(s)\n";
-    std::cout << "  [batch-process-freq] Batch Generation:  " << batchFreq << " cycle(s)\n";
-    std::cout << "  [min-ins]            Min Instructions:  " << minIns << "\n";
-    std::cout << "  [max-ins]            Max Instructions:  " << maxIns << "\n";
-    std::cout << "  [delay-per-exec]     Execution Delay:   " << delayPerExec << " cycle(s)\n";
+    std::cout << "  Number of Cores:   " << numCores << "\n";
+    std::cout << "  Scheduling Algo:   " << scheduler << "\n";
+    std::cout << "  Quantum Slice:     " << quantum << " cycle(s)\n";
+    std::cout << "  Batch Generation:  " << batchFreq << " cycle(s)\n";
+    std::cout << "  Min Instructions:  " << minIns << "\n";
+    std::cout << "  Max Instructions:  " << maxIns << "\n";
+    std::cout << "  Execution Delay:   " << delayPerExec << " cycle(s)\n";
     std::cout << "--------------------------------------------------------------------------------------\n\n";
 }
 
@@ -79,7 +79,7 @@ int main() {
     int globalMaxIns = 10;
     unsigned int globalDelayPerExec = 0;
 
-    // PRE-INITIALIZATION STAGE (Completely blank terminal guard block)
+    // PRE-INITIALIZATION STAGE
     while (true) {
         std::cout << "root:\\> ";
         std::string preInput;
@@ -91,17 +91,15 @@ int main() {
                 continue; 
             }
 
-            // Provision constraints down to underlying runtime engines
-            Report::setTotalCores(globalNumCores);
+            // Place the Config to the correct classes
+            CPU::initialize(globalNumCores, globalScheduler, globalQuantumCycles);
             Process::setGlobalDelayPerExec(globalDelayPerExec);
+            BatchGeneration::initialize(globalMinIns, globalMaxIns, globalBatchFreq);
             break;
         } 
         // Allow a clean exit even if they haven't initialized yet
         else if (preInput == "exit") {
             return 0; 
-        }
-        else if (!preInput.empty()) {
-            std::cout << "Error: You must run the 'initialize' command first.\n";
         }
     }
 
@@ -111,24 +109,76 @@ int main() {
 
     // MAIN RUNTIME SCHEDULER INTERACTIVE CLI COMMAND LOOP
     while (true) {
-        std::cout << "root:\\> ";
-        std::string input;
-        std::getline(std::cin, input);
-
         if (input == "exit") {
-            break;
+            std::cout << "Terminating worker threads and closing console safely...\n";
+            
+            // STATELESS CLEANUP: Order matters to prevent hanging blocks
+            BatchGeneration::shutdown();
+            CPU::shutdown();
+            
+            break; // Breaks out of the while(true) loop to end main()
         }
         else if (input == "screen -ls") {
             Report::printScreenList();
         }
+        else if (input == "scheduler-start") {
+            BatchGeneration::start();
+            std::cout << "Batch generation activated. Dummy processes are spawning...\n";
+        }
+        else if (input == "scheduler-stop") {
+            BatchGeneration::stop();
+            std::cout << "Batch process generation paused.\n";
+        }
         else if (input == "report-util") {
             if (Report::generateUtilReport()) {
-                std::cout << "Report generated at csopesy-log.txt!\n";
+                std::cout << "Utilization metrics logged to csopesy-log.txt!\n";
             } else {
-                std::cout << "Error creating report file.\n";
+                std::cout << "Error writing utility log file.\n";
             }
         }
-        // Sub-screen handling triggers can be placed right here!
+        //Make sure to go last so it doesnt mess with screen -ls
+        else if (input.rfind("screen", 0) == 0) {
+            
+            // Trim or break apart options via parsing spaces
+            std::vector<std::string> tokens;
+            std::string token;
+            std::size_t start = 0, end = 0;
+            
+            //Tokenize
+            while ((end = input.find(' ', start)) != std::string::npos) {
+                if (end != start){
+                    tokens.push_back(input.substr(start, end - start));
+                }
+                start = end + 1;
+            }
+            if (start < input.size()){ //Get Last Substring
+                tokens.push_back(input.substr(start));
+            } 
+
+            // Check if argument structural bounds are acceptable
+            if (tokens.size() == 3) {
+                std::string mode = tokens[1];
+                std::string name = tokens[2];
+
+                if (mode == "-s") {
+                    // Spawn and Attach using global config defaults passed from main
+                    Screen::enterProcessScreen(name, globalMinIns, globalMaxIns);
+                } 
+                else if (mode == "-r") {
+                    // Standard re-attach execution handle
+                    Screen::enterProcessScreen(name);
+                } 
+                else {
+                    std::cout << "Invalid flag. Use 'screen -s [name]' or 'screen -r [name]'.\n";
+                }
+            } 
+            else {
+                std::cout << "Usage error. Format expected: 'screen [-s/-r] [name]'.\n";
+            }
+        }
+        else {
+            std::cout << "Command not recognized.\n";
+        }
     }
 
     return 0;

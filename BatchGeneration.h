@@ -7,40 +7,37 @@
 #include <iostream>
 #include "RQ.h"
 #include "ProcessMap.h"
+#include "CPU.h" // Include our static CPU to look up clock updates
 
 /*
 Class that is responsible for batch generating processes
-
-Runs a background thread 
+Runs a background thread synchronized with the static CPU hardware clock.
 */
-
 class BatchGeneration {
 private:
     inline static int minIns = 0;
     inline static int maxIns = 0;
     inline static unsigned int batchProcessFreq = 1;
     inline static std::atomic<bool> isRunning{false};
+    inline static std::atomic<bool> shouldTerminate{false}; // Clear flat shutdown flag
 
     inline static std::thread workerThread;
-    
-    // Pointer to hold the shared CPU master clock reference dynamically
-    inline static const std::atomic<unsigned long long>* globalCycleRef = nullptr;
 
     // The background execution loop
     static void runBatchLoop() {
         unsigned long long lastCheckedCycle = 0;
         unsigned int cycleAccumulator = 0;
 
-        while (true) {
-            // Check if the thread should shut down completely
-            if (globalCycleRef == nullptr) break;
+        while (!shouldTerminate.load()) {
+            unsigned long long currentCycle = CPU::getCycleCount();
 
-            // --- ATOMIC WAIT SYSTEM ---
-            // Wakes up on EVERY clock pulse or when notified
-            unsigned long long currentCycle = globalCycleRef->load();
-            while (currentCycle == lastCheckedCycle) {
-                globalCycleRef->wait(lastCheckedCycle);
-                currentCycle = globalCycleRef->load();
+            // --- ZERO-POINTER ATOMIC WAIT SYSTEM ---
+            // If the CPU hasn't ticked forward yet, we wait gracefully
+            if (currentCycle == lastCheckedCycle) {
+                // We don't have an object reference anymore—we just sleep a tiny fraction 
+                // of our CPU cycle duration (250ms / 5 = 50ms) to check the state.
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                continue;
             }
             lastCheckedCycle = currentCycle;
 
@@ -57,7 +54,7 @@ private:
             if (cycleAccumulator >= batchProcessFreq) {
                 cycleAccumulator = 0; // Reset threshold tracker
 
-                // Generate the process utilizing our overloaded constructor/factory sequence
+                // Generate the process utilizing our constructor/factory sequence
                 int spawnedPid = ProcessMap::createNewProcess(minIns, maxIns);
                 RQ::addToReady(spawnedPid);
             }
@@ -68,13 +65,13 @@ public:
     // Purely static configuration manager class
     BatchGeneration() = delete;
 
-    // Initializes the generator loop and binds it to the hardware CPU master clock
-    static void initialize(const std::atomic<unsigned long long>& cpuMasterClock, int min, int max, unsigned int frequency) {
+    // Initializes the generator loop configuration settings
+    static void initialize(int min, int max, unsigned int frequency) {
         minIns = min;
         maxIns = max;
         batchProcessFreq = frequency;
-        globalCycleRef = &cpuMasterClock;
-        isRunning = false; // Start in a paused state until explicitly kicked off
+        isRunning = false;       // Start in a paused state until "scheduler-start" is run
+        shouldTerminate = false;
 
         // Launch the single perpetual manager thread
         workerThread = std::thread(&BatchGeneration::runBatchLoop);
@@ -98,12 +95,7 @@ public:
 
     // Safe teardown routine during execution exit
     static void shutdown() {
-        globalCycleRef = nullptr; // Breaks the while loop
-        
-        // Safety wake call just in case it's caught waiting inside the cycle lock loop
-        if (globalCycleRef != nullptr) {
-            // Note: In main.cpp, ensure you notify after removing references
-        }
+        shouldTerminate = true; // Breaks the loop cleanly
         
         if (workerThread.joinable()) {
             workerThread.join();

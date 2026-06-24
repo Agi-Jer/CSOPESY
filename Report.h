@@ -9,16 +9,17 @@
 #include "RQ.h"
 #include "ProcessMap.h"
 #include "Process.h"
+#include "CPU.h"
 
 class Report {
 private:
-    // Globally configured total CPU cores set via "initialize" in main
-    inline static int totalCores = 0;
-
     // Internal helper to build the unified ASCII snapshot string block
     static std::string buildSnapshotString() {
         std::vector<int> runningPids = RQ::getRunningProcesses();
         std::vector<int> finishedPids = RQ::getFinishedProcesses();
+
+        // Dynamically grab the absolute source of truth directly from the CPU
+        int totalCores = CPU::getNumCores();
 
         int coresUsed = static_cast<int>(runningPids.size());
         if (coresUsed > totalCores) coresUsed = totalCores; // Upper bound guard
@@ -38,7 +39,6 @@ private:
         for (int pid : runningPids) {
             Process* proc = ProcessMap::getProcess(pid);
             if (proc != nullptr) {
-                // Formatting tabs to make properties columns match line 44 mockup layout
                 output += proc->getName() + "\t" 
                        + proc->getCreationTime() + "\t"
                        + "Core: " + std::to_string(proc->getAssignedCore()) + "\t"
@@ -69,11 +69,6 @@ private:
 public:
     // Pure static implementation
     Report() = delete;
-
-    // Setter invoked during the "initialize" step to cache total core num
-    static void setTotalCores(int cores) {
-        if (cores > 0) totalCores = cores;
-    }
 
     // Handles the live display for the "screen -ls" command workflow
     static void printScreenList() {

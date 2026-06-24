@@ -6,66 +6,51 @@
 #include <chrono>
 #include <iostream>
 #include <atomic>
-#include <memory> // Required for std::unique_ptr and std::make_unique
+#include <memory>
 #include "Core.h" 
+#include "ProcessMap.h"
+#include "RQ.h"
 
 /*
-Represents an abstraction of the CPU itself
-
-handles primarily the Cores and the cpu cycle logic
-
-Wrapper for Cores
+Represents a static abstraction of the CPU itself.
+Handles primarily the Cores and the background master clock cycle thread.
 */
-
-
 class CPU {
 private:
-    int numCores; //Num of cores in CPU
-    // Updated to use unique_ptr so non-copyable/non-movable Cores can reside safely
-    std::vector<std::unique_ptr<Core>> cores; //Vector of Core class
-    
-    std::thread cpuThread; //Clock cycle Thread
-    std::atomic<bool> isRunning; //Bool to check if CPU is still running
-    
-    // Updated to an atomic type so cores can sleep on it cleanly
-    std::atomic<unsigned long long> cycleCount; //CPU cycle tracker
+    // Pure static state variables (Inline initialized for C++20)
+    inline static int numCores = 0;
+    inline static std::vector<std::unique_ptr<Core>> cores;
+    inline static std::thread cpuThread;
+    inline static std::atomic<bool> isRunning{false};
+    inline static std::atomic<unsigned long long> cycleCount{0};
 
     // Iterates through all currently sleeping processes and decrements their timers
-    void manageWaitingQueue() {
-        // Grab a snapshot copy of the waiting PIDs to iterate safely
+    static void manageWaitingQueue() {
         std::vector<int> waitingPids = RQ::getWaitingProcesses();
 
         for (int pid : waitingPids) {
-            //Get process from map
             Process* proc = ProcessMap::getProcess(pid);
             if (proc != nullptr) {
-                // Decrement the local sleep counter inside the process
                 proc->decrementSleep();
 
-                // If the process woke up and changed its state back to READY
                 if (!proc->isSleeping()) {
-                    // Update global queues: remove from waiting list, push to ready loop
                     RQ::removeFromWaiting(pid);
                     RQ::addToReady(pid);
                 }
             } else {
-                // Safety cleanup: If a process somehow vanished from memory, clear it out
                 RQ::removeFromWaiting(pid);
             }
         }
     }
 
-    // background cpu cycle thread
-    void runCPULoop() {
-        // ~30 cycles per second (approx 33.33ms per cycle)
-        //auto cycleDuration = std::chrono::microseconds(33333); // ~30 Hz
-        //slower for this example
-        auto cycleDuration = std::chrono::milliseconds(250);//~4Hz
+    // Background CPU master clock cycle loop thread
+    static void runCPULoop() {
+        auto cycleDuration = std::chrono::milliseconds(250); // ~4Hz
 
         while (isRunning) {
             auto startTime = std::chrono::steady_clock::now();
 
-            // --- CPU CYCLE WORK HAPPENS HERE ---
+            // --- CPU MASTER CLOCK TICK ---
             cycleCount++;
             
             // Ticks down the timers for any processes currently blocked/sleeping
@@ -75,7 +60,6 @@ private:
             cycleCount.notify_all(); 
             // ------------------------------------
 
-            // Calculate how long the work took and sleep for the remaining time
             auto endTime = std::chrono::steady_clock::now();
             auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
 
@@ -86,34 +70,46 @@ private:
     }
 
 public:
-    // Constructor
-    CPU(int coresCount) : numCores(coresCount), cycleCount(0), isRunning(false) {
+    // Delete constructor since it's a pure static UI/Engine module
+    CPU() = delete;
+
+    // Bootstraps the CPU engine (Called once during initialize)
+    static void initialize(int coresCount, const std::string& schedulerAlgo, unsigned int quantumCycles = 1) {
+        if (isRunning) return; // Prevent duplicate instantiation collisions
+
+        numCores = coresCount;
+        cycleCount = 0;
         isRunning = true;
         
-        // Pass references to the operational flags and our updated atomic clock count
-        // Instantiate the blank Core classes into our vector via make_unique
+        // Populate core clusters passing the inner atomic reference down securely
         for (int i = 0; i < numCores; ++i) {
-            cores.push_back(std::make_unique<Core>(i, isRunning, cycleCount, "FCFS")); 
+            cores.push_back(std::make_unique<Core>(i, isRunning, cycleCount, schedulerAlgo, quantumCycles)); 
         }
             
-        cpuThread = std::thread(&CPU::runCPULoop, this);
+        // Spawn background master hardware clock thread
+        cpuThread = std::thread(&CPU::runCPULoop);
     }
 
-    // Destructor: Essential for cleaning up the thread safely when the CPU shuts down
-    ~CPU() {
-        isRunning = false; // Signals the while loop to terminate safely
-        
-        // Unblock any threads that are currently trapped in the globalCycleRef.wait() loop
-        cycleCount.notify_all(); 
+    // Shuts down execution blocks and joins threads safely
+    static void shutdown() {
+        if (!isRunning) return;
+
+        isRunning = false; 
+        cycleCount.notify_all(); // Wake up any threads waiting for a clock tick
         
         if (cpuThread.joinable()) {
-            cpuThread.join(); // Waits for the thread to completely finish up before destroying the CPU object
+            cpuThread.join(); 
         }
+        cores.clear(); // Free allocated Core memory handles safely
     }
 
-    // Getter to check the current cycle count statically or dynamically
-    unsigned long long getCycleCount() const {
+    // Globally accessible atomic snapshot trackers
+    static unsigned long long getCycleCount() {
         return cycleCount.load();
+    }
+
+    static int getNumCores() {
+        return numCores;
     }
 };
 
