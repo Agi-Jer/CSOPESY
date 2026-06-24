@@ -4,7 +4,8 @@
 #include <map>
 #include <string>
 #include <iostream>
-#include <mutex> // Included for multi-threaded safety
+#include <mutex> 
+#include <memory> // Needed for std::shared_ptr
 #include "Process.h"
 
 /*
@@ -17,8 +18,8 @@ other classes simply traded in pids and reference this static class instead
 
 class ProcessMap {
 private:
-    // Global static registry holding all active or finished processes
-    inline static std::map<int, Process> registry;
+    // Global static registry holding all active or finished processes (Switched to shared_ptr for heap stability)
+    inline static std::map<int, std::shared_ptr<Process>> registry;
 
     // Static mutex to synchronize access across all 128 simulated CPU cores
     inline static std::mutex mapMutex;
@@ -32,11 +33,11 @@ public:
         // Automatically locks the mutex for the duration of this function scope
         std::lock_guard<std::mutex> lock(mapMutex);
 
-        // Instantiate the process object
-        Process newProc(processName, minIns, maxIns);
-        int pid = newProc.getPid();
+        // Instantiate the process object cleanly on the heap
+        auto newProc = std::make_shared<Process>(processName, minIns, maxIns);
+        int pid = newProc->getPid();
 
-        // Move/insert it into our map using PID as the unique key
+        // Store the shared pointer securely using PID as the unique key
         registry[pid] = newProc;
 
         return pid;
@@ -47,24 +48,24 @@ public:
         // Automatically locks the mutex for the duration of this function scope
         std::lock_guard<std::mutex> lock(mapMutex);
 
-        // Instantiate the process object using the min/max constructor overload
-        Process newProc(minIns, maxIns);
-        int pid = newProc.getPid();
+        // Instantiate the process object using the min/max constructor overload on the heap
+        auto newProc = std::make_shared<Process>(minIns, maxIns);
+        int pid = newProc->getPid();
 
-        // Move/insert it into our map using PID as the unique key
+        // Store the shared pointer securely using PID as the unique key
         registry[pid] = newProc;
 
         return pid;
     }
 
-    // Gets a direct memory pointer to a specific process by its PID
+    // Gets a stable memory pointer to a specific process by its PID
     static Process* getProcess(int pid) {
         // Automatically locks the mutex to safely search the map structure
         std::lock_guard<std::mutex> lock(mapMutex);
 
         auto it = registry.find(pid);
         if (it != registry.end()) {
-            return &(it->second); // Return the memory address of the Process object inside the map
+            return it->second.get(); // Return the raw underlying stable address safely
         }
         return nullptr; // Return nullptr safely if the PID doesn't exist
     }
@@ -75,8 +76,8 @@ public:
 
         // Loop through the map to find the matching name property
         for (auto& [pid, proc] : registry) {
-            if (proc.getName() == processName) {
-                return &proc; // Return the exact memory position
+            if (proc->getName() == processName) {
+                return proc.get(); // Return the exact stable memory position
             }
         }
         return nullptr; // Return nullptr if no process matches that name string

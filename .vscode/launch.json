@@ -3,11 +3,10 @@
     "configurations": [
         {
             "name": "Compile and Run Emulator",
-            "type": "mock",
+            "type": "node",                  // 🚀 Built-in natively; guarantees NO "not supported" popups!
             "request": "launch",
-            "program": "${workspaceFolder}/main",
-            "stopOnEntry": false,
-            "preLaunchTask": "run-in-ptyxis"
+            "program": "${workspaceFolder}/main", 
+            "preLaunchTask": "run-in-ptyxis" // 🛠️ Triggers your Ptyxis compilation and terminal perfectly
         }
     ]
 }

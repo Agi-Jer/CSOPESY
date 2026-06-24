@@ -109,6 +109,9 @@ int main() {
 
     // MAIN RUNTIME SCHEDULER INTERACTIVE CLI COMMAND LOOP
     while (true) {
+        std::cout << "root:\\> ";
+        std::string input;
+        std::getline(std::cin, input);
         if (input == "exit") {
             std::cout << "Terminating worker threads and closing console safely...\n";
             
@@ -161,13 +164,19 @@ int main() {
                 std::string name = tokens[2];
 
                 if (mode == "-s") {
-                    // Spawn and Attach using global config defaults passed from main
-                    Screen::enterProcessScreen(name, globalMinIns, globalMaxIns);
+                    // Only clear and redraw if the screen was successfully spawned and entered
+                    if (Screen::enterProcessScreen(name, globalMinIns, globalMaxIns)) {
+                        std::system("clear"); 
+                        showBanner(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+                    }
                 } 
                 else if (mode == "-r") {
-                    // Standard re-attach execution handle
-                    Screen::enterProcessScreen(name);
-                } 
+                    // Only clear and redraw if re-attaching successfully found the process
+                    if (Screen::enterProcessScreen(name)) {
+                        std::system("clear"); 
+                        showBanner(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+                    }
+                }
                 else {
                     std::cout << "Invalid flag. Use 'screen -s [name]' or 'screen -r [name]'.\n";
                 }

@@ -49,6 +49,14 @@ private:
         int maxChoice = (currentDepth >= 3) ? 5 : 6; 
         int choice = rand() % maxChoice; 
 
+        // MNew Weighted rng because my processes were sleeping too much
+        if (choice >= 0 && choice < 3)        choice = 0; // PRINT (Weights 0, 1, 2)
+        else if (choice >= 3 && choice < 6)   choice = 1; // DECLARE (Weights 3, 4, 5)
+        else if (choice >= 6 && choice < 9)   choice = 2; // ADD (Weights 6, 7, 8)
+        else if (choice >= 9 && choice < 12)  choice = 3; // SUBTRACT (Weights 9, 10, 11)
+        else if (choice == 12)                choice = 4; // SLEEP (Weight 12)
+        else if (choice == 13 || choice == 14) choice = 5; // FOR (Weights 13, 14)
+
         std::string v1 = VAR_POOL[rand() % VAR_POOL.size()];
         std::string v2 = VAR_POOL[rand() % VAR_POOL.size()];
         std::string v3 = VAR_POOL[rand() % VAR_POOL.size()];

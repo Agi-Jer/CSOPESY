@@ -39,19 +39,19 @@ public:
     Screen() = delete; // Pure static UI component
 
     // OVERLOAD 1: Standard Re-attach (Equivalent to screen -r)
-    static void enterProcessScreen(const std::string& processName) {
+    static bool enterProcessScreen(const std::string& processName) {
         Process* proc = ProcessMap::getProcessByName(processName);
 
         // Guard: Process doesn't exist at all in the registry
         if (proc == nullptr) {
             std::cout << "Process " << processName << " not found.\n";
-            return;
+            return false;
         }
 
         // Guard: Process exists but has already finished (Strict spec match)
         if (proc->isFinished()) {
             std::cout << "Process " << processName << " not found.\n";
-            return;
+            return false;
         }
 
         //My ass is on Linux
@@ -75,14 +75,15 @@ public:
                 std::cout << "Command not recognized within process screen context.\n";
             }
         }
+        return true;
     }
 
     // OVERLOAD 2: Spawn & Attach (Equivalent to screen -s)
-    static void enterProcessScreen(const std::string& processName, int minIns, int maxIns) {
+    static bool enterProcessScreen(const std::string& processName, int minIns, int maxIns) {
         // Check if a process with this name already exists to prevent duplication collisions
         if (ProcessMap::getProcessByName(processName) != nullptr) {
             std::cout << "Error: A process named '" << processName << "' already exists.\n";
-            return;
+            return false;
         }
 
         // Call the function from ProcessMap to instantiate and register it
@@ -92,7 +93,7 @@ public:
         RQ::addToReady(newPid);
 
         // Fall back directly to the original function to clear the screen and start the loop
-        enterProcessScreen(processName);
+        return enterProcessScreen(processName);
     }
 };
 

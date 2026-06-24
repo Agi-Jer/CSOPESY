@@ -70,6 +70,24 @@ public:
         return wQueue;
     }
 
+    // Had an issue with screen getting running and finished but having cores run in between
+    // Tying the two together to fix this
+    static void getSnapshotPids(std::vector<int>& outReady, std::vector<int>& outRunning, std::vector<int>& outWaiting, std::vector<int>& outFinished) {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        
+        // Convert the std::queue rQueue to a vector so it can be read safely by the report engine
+        outReady.clear();
+        std::queue<int> tempCopy = rQueue;
+        while (!tempCopy.empty()) {
+            outReady.push_back(tempCopy.front());
+            tempCopy.pop();
+        }
+
+        outRunning = runQueue;
+        outWaiting = wQueue;
+        outFinished = fQueue;
+    }
+
     // Removes a PID from the running queue (called when a process yields, sleeps, or finishes)
     static void removeFromRunning(int pid) {
         std::lock_guard<std::mutex> lock(queueMutex);
@@ -90,6 +108,13 @@ public:
                 break;
             }
         }
+    }
+
+    // Returns true if the Ready Queue has zero processes waiting
+    static bool isEmptyReady() {
+        // Lock guard ensures exclusive access across all concurrent Core threads
+        std::lock_guard<std::mutex> lock(queueMutex);
+        return rQueue.empty();
     }
 };
 

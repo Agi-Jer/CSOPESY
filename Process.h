@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iomanip>
 #include <ctime>
+#include <atomic> // Include atomic for thread synchronization
 #include "Instruction.h"
 #include "SymbolTable.h"
 #include "GenerateProcessInstructions.h" // Include factory class
@@ -20,8 +21,8 @@ running the low level logic for processing the instructions
 */
 class Process {
 private:
-    // New process execution states
-    enum class ProcessState {
+    // New process execution states (Added explicit int backing type for atomic usage compatibility)
+    enum class ProcessState : int {
         READY,
         RUNNING,
         WAITING,
@@ -33,7 +34,7 @@ private:
     int pid;                    // Unique process ID
     std::string name;           // Process name
     int assignedCore;           // CPU core currently assigned
-    bool finished;              // Is this process finished?
+    std::atomic<bool> finished; // Is this process finished? (Thread-safe status checking)
 
     int currentInstruction;     // Current instruction index
     int totalInstructions;      // Total instructions in the program
@@ -46,8 +47,8 @@ private:
 
     // RUNTIME ENGINE FIELDS
     SymbolTable sTable;         // Private memory bank for THIS process context
-    unsigned int sleepTimer = 0;// Handles process sleep cycles
-    ProcessState state = ProcessState::READY; // Current scheduling lifecycle state
+    std::atomic<unsigned int> sleepTimer{0}; // Handles process sleep cycles atomically across threads
+    std::atomic<ProcessState> state{ProcessState::READY}; // Current scheduling lifecycle state handled atomically
 
     //PROCESS SMI
     std::vector<std::string> screenLogBuffer;    //Log Buffer for process-smi
@@ -202,19 +203,21 @@ public:
         }
 
         //Reset State
-        currentInstruction++;
         dateLastInstruction = std::chrono::system_clock::now();  
-        currentDelayCounter = globalDelayPerExec; // If globalDelayPerExec is 0, this sets it to 0, running 1 instruction per cycle perfectly.
         
         // Route the current active line to the execution handler
         executeInstruction(instructions[currentInstruction]);
 
-        if (currentInstruction >= static_cast<int>(instructions.size())) {
+        currentInstruction++;
+        
+        // FIX: Verify completion limit threshold bounds immediately before allocating execution delays
+        if (currentInstruction >= totalInstructions) {
             finished = true;
             state = ProcessState::FINISHED;
+            currentDelayCounter = 0;
+        } else {
+            currentDelayCounter = globalDelayPerExec; // If globalDelayPerExec is 0, this sets it to 0, running 1 instruction per cycle perfectly.
         }
-
-        
     }
 
     void decrementSleep() { 
@@ -252,7 +255,7 @@ public:
 
     // Converts enum to human-readable text for visual terminal dumps
     std::string getStateString() const {
-        switch (state) {
+        switch (state.load()) {
             case ProcessState::READY:    return "READY";
             case ProcessState::RUNNING:  return "RUNNING";
             case ProcessState::WAITING:  return "WAITING";
