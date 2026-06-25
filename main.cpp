@@ -81,7 +81,6 @@ int main() {
 
     // PRE-INITIALIZATION STAGE
     while (true) {
-        std::cout << "root:\\> ";
         std::string preInput;
         std::getline(std::cin, preInput);
 

@@ -44,9 +44,12 @@ private:
         for (int pid : runningPids) {
             Process* proc = ProcessMap::getProcess(pid);
             if (proc != nullptr) {
+                int coreId = proc->getAssignedCore();
+                std::string coreStr = (coreId >= 0 && coreId < totalCores) ? std::to_string(coreId) : "N/A";
+
                 output += proc->getName() + "\t" 
                        + proc->getCreationTime() + "\t"
-                       + "Core: " + std::to_string(proc->getAssignedCore()) + "\t"
+                       + "Core: " + coreStr + "\t"
                        + std::to_string(proc->getCurrentInstruction()) + " / " 
                        + std::to_string(proc->getTotalInstructions()) + "\n";
             }
@@ -159,7 +162,7 @@ public:
 
     // Handles the live display for the "screen -ls" command workflow
     static void printScreenList() {
-        std::cout << buildSnapshotStringComplete();
+        std::cout << buildSnapshotString();
     }
 
     // Handles the file export system for the "report-util" command workflow

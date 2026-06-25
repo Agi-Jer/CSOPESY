@@ -151,6 +151,13 @@ private:
     void executePrint(const std::vector<std::string>& args) {
         std::string rawMessage = args[0];
 
+        // If the blueprint passed a second argument, it's our variable name to append
+        if (args.size() > 1) {
+            std::string varName = args[1];
+            // FIX: Using resolveValue instead of the non-existent function
+            rawMessage += std::to_string(resolveValue(varName));
+        }
+
         // Get current timestamp and core details at this exact instruction tick
         std::string timestamp = formatTimestamp(dateLastInstruction);
         std::string coreStr = "Core:" + (assignedCore != -1 ? std::to_string(assignedCore) : "N/A");

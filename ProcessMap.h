@@ -30,12 +30,12 @@ public:
 
     // Creates a new process, places it in the map, and returns its assigned PID
     static int createNewProcess(std::string processName, int minIns, int maxIns) {
-        // Automatically locks the mutex for the duration of this function scope
-        std::lock_guard<std::mutex> lock(mapMutex);
-
         // Instantiate the process object cleanly on the heap
         auto newProc = std::make_shared<Process>(processName, minIns, maxIns);
         int pid = newProc->getPid();
+
+        // Automatically locks the mutex for the duration of this function scope
+        std::lock_guard<std::mutex> lock(mapMutex);
 
         // Store the shared pointer securely using PID as the unique key
         registry[pid] = newProc;
@@ -45,12 +45,12 @@ public:
 
     // Overloaded method that creates a new process with an auto-generated name
     static int createNewProcess(int minIns, int maxIns) {
-        // Automatically locks the mutex for the duration of this function scope
-        std::lock_guard<std::mutex> lock(mapMutex);
-
         // Instantiate the process object using the min/max constructor overload on the heap
         auto newProc = std::make_shared<Process>(minIns, maxIns);
         int pid = newProc->getPid();
+
+        // Automatically locks the mutex for the duration of this function scope
+        std::lock_guard<std::mutex> lock(mapMutex);
 
         // Store the shared pointer securely using PID as the unique key
         registry[pid] = newProc;

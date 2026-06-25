@@ -43,25 +43,30 @@ private:
     const std::atomic<unsigned long long>& globalCycleRef; 
     unsigned long long currCycle; 
 
+    //Pull process from front of RQ
+    void pullNextProcess() {
+        int poppedPid = -1; // Temporary container for tryPopReady
+        if (RQ::tryPopReady(poppedPid)) {
+            currentPid = poppedPid;
+            holdsProcess = true;
+            
+            // Fetch and cache the direct pointer once during acquisition
+            currentProcess = ProcessMap::getProcess(currentPid);
+            if (currentProcess != nullptr) {
+                currentProcess->setRunning();
+                currentProcess->setAssignedCore(coreId);
+            }
+            
+            // Mirror onto the global running registry tracking system
+            RQ::addToRunning(currentPid);
+        }
+    }
+    
     // First-Come, First-Served scheduling implementation
     void fcfs() {
         // FCFS Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
-            int poppedPid = -1; // Temporary container for tryPopReady
-            if (RQ::tryPopReady(poppedPid)) {
-                currentPid = poppedPid;
-                holdsProcess = true;
-                
-                // Fetch and cache the direct pointer once during acquisition
-                currentProcess = ProcessMap::getProcess(currentPid);
-                if (currentProcess != nullptr) {
-                    currentProcess->setRunning();
-                    currentProcess->setAssignedCore(coreId);
-                }
-                
-                // Mirror onto the global running registry tracking system
-                RQ::addToRunning(currentPid);
-            }
+            pullNextProcess();
         }
 
         // Execution of Instruction using the cached pointer directly
@@ -69,24 +74,29 @@ private:
             // runCycle handles execution routing, internal clocks, and auto-finishing flags
             currentProcess->runCycle();
 
+            bool dropped = false;
+
             // Step A: Check if the instruction placed the process in a WAITING state (e.g., SLEEP instruction)
             if (currentProcess->isSleeping()) {
                 RQ::removeFromRunning(currentPid);
                 RQ::addToWaiting(currentPid);
+                dropped = true;
                 
-                // Reset fields completely to signal core availability
-                currentPid = -1;
-                currentProcess = nullptr;
-                holdsProcess = false;
             }
             // Step B: Check if the process naturally exhausted its program lines
             else if (currentProcess->isFinished()) { 
                 RQ::removeFromRunning(currentPid);
                 RQ::addToFinished(currentPid);
-                
+                dropped = true;
+            }
+            // Reset fields completely to signal core availability
+            if (dropped) {
                 currentPid = -1;
                 currentProcess = nullptr;
-                holdsProcess = false; 
+                holdsProcess = false;
+                
+                // Immediate backfill optimization
+                pullNextProcess(); 
             }
         } else if (holdsProcess) {
             // Fallback safety case: If core thinks it has work but pointer is null, reset flags
@@ -100,24 +110,8 @@ private:
     void rr() {
         // RR Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
-            int poppedPid = -1; // Temporary container for tryPopReady
-            if (RQ::tryPopReady(poppedPid)) {
-                currentPid = poppedPid;
-                holdsProcess = true;
-                
-                // Fetch and cache the direct pointer once during acquisition
-                currentProcess = ProcessMap::getProcess(currentPid);
-                if (currentProcess != nullptr) {
-                    currentProcess->setRunning();
-                    currentProcess->setAssignedCore(coreId);
-                }
-                
-                // Mirror onto the global running registry tracking system
-                RQ::addToRunning(currentPid);
-                
-                // Reset the quantum tracker for this freshly scheduled process
-                trackQCycle = 0; 
-            }
+            pullNextProcess();
+            trackQCycle = 0; 
         }
 
         // Execution of Instruction using the cached pointer directly
@@ -128,25 +122,19 @@ private:
             // Advance our perpetual quantum clock tracker by 1 cycle
             trackQCycle++;
 
+            bool dropped = false;
+
             // Scenario A: The process hit a SLEEP instruction and went into a WAITING state
             if (currentProcess->isSleeping()) {
                 RQ::removeFromRunning(currentPid);
                 RQ::addToWaiting(currentPid);
-                
-                currentPid = -1;
-                currentProcess = nullptr;
-                holdsProcess = false;
-                trackQCycle = 0;
+                dropped = true;
             }
             // Scenario B: The process naturally finished its workload during this cycle
             else if (currentProcess->isFinished()) { 
                 RQ::removeFromRunning(currentPid);
                 RQ::addToFinished(currentPid);
-                
-                currentPid = -1;
-                currentProcess = nullptr;
-                holdsProcess = false; 
-                trackQCycle = 0; 
+                dropped = true;
             }
             // Scenario C: Process is not finished or waiting, but the time slice has expired!
             else if (trackQCycle >= quantumCycle) {
@@ -160,12 +148,17 @@ private:
 
                     RQ::removeFromRunning(currentPid);                     
                     RQ::addToReady(currentPid);           
-                    
-                    currentPid = -1;                     
-                    currentProcess = nullptr;
-                    holdsProcess = false;
-                    trackQCycle = 0; 
+                    dropped = true;
                 }
+            }
+            if (dropped) {
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false;
+                trackQCycle = 0; 
+
+                // 🚀 Immediate backfill optimization
+                pullNextProcess(); 
             }
         } else if (holdsProcess) {
             // Fallback safety case: If core thinks it has work but pointer is null, reset flags

@@ -41,12 +41,12 @@ private:
 
     // Unified recursive blueprint generator (Handles all 6 opcodes cleanly)
     // Caches processName to dynamically build the required specification PRINT string literal
-    static InstructionBlueprint generateSingleBlueprint(int currentDepth, const std::string& processName) {
+    static InstructionBlueprint generateSingleBlueprint(int currentDepth, const std::string& processName, int remainingBuffer) {
         InstructionBlueprint bp;
         
         // Pick randomly from all possible instructions. 
         // If we are at depth 3, cap it so it cannot choose OpCode::FOR anymore (6th type).
-        int maxChoice = (currentDepth >= 3) ? 5 : 6; 
+        int maxChoice = (currentDepth >= 3 || remainingBuffer <= 200) ? 13 : 15; 
         int choice = rand() % maxChoice; 
 
         // MNew Weighted rng because my processes were sleeping too much
@@ -93,7 +93,7 @@ private:
                 // Generates a multi-instruction "set/array" loop body
                 int bodySize = 1 + (rand() % 3); 
                 for (int i = 0; i < bodySize; ++i) {
-                    bp.loopBody.push_back(generateSingleBlueprint(currentDepth + 1, processName));
+                    bp.loopBody.push_back(generateSingleBlueprint(currentDepth + 1, processName, remainingBuffer));
                 }
                 break;
             }
@@ -114,6 +114,33 @@ private:
         }
     }
 
+    static InstructionBlueprint generateStep(int currentDepth, const std::string& processName, int remainingBuffer) {
+        if (remainingBuffer >= 600) {
+            InstructionBlueprint masterLoop;
+            masterLoop.op = OpCode::FOR;
+            masterLoop.repeats = 100;
+
+            InstructionBlueprint addX; addX.op = OpCode::ADD; addX.args = {"x", "x", "1"};
+            InstructionBlueprint printX; printX.op = OpCode::PRINT; printX.args = {"Value from: ", "x"};
+            
+            InstructionBlueprint addY; addY.op = OpCode::ADD; addY.args = {"y", "y", "1"};
+            InstructionBlueprint printY; printY.op = OpCode::PRINT; printY.args = {"Value from: ", "y"};
+            
+            InstructionBlueprint addZ; addZ.op = OpCode::ADD; addZ.args = {"z", "z", "1"};
+            InstructionBlueprint printZ; printZ.op = OpCode::PRINT; printZ.args = {"Value from: ", "z"};
+
+            masterLoop.loopBody = {addX, printX, addY, printY, addZ, printZ};
+            return masterLoop;
+        } else {
+            // If we don't have space for a full 600-line loop block but still need to fill 
+            // up to minIns, return flat 1-line filler instructions to top it off perfectly.
+            InstructionBlueprint filler;
+            filler.op = OpCode::PRINT;
+            filler.args = {"Hello world from " + processName + "!"};
+            return filler;
+        }
+    }
+
 public:
     // Main factory method called once by Process constructor
     static std::vector<Instruction> createProgram(const std::string& processName, int minIns, int maxIns) {
@@ -125,10 +152,17 @@ public:
             size_t totalProjectedSize = 0;
 
             // Generate instructions sequentially at the top level (depth = 1)
-            int initialItems = minIns; 
-            for (int i = 0; i < initialItems; ++i) {
-                InstructionBlueprint bp = generateSingleBlueprint(1, processName);
-                totalProjectedSize += bp.calculateFlatSize();
+            while (totalProjectedSize < (size_t)minIns) {
+                int remainingBuffer = maxIns - static_cast<int>(totalProjectedSize);
+                //InstructionBlueprint bp = generateSingleBlueprint(0, processName, remainingBuffer);
+                InstructionBlueprint bp = generateStep(0, processName, remainingBuffer);
+                
+                size_t bpSize = bp.calculateFlatSize();
+                if (totalProjectedSize + bpSize > (size_t)maxIns) {
+                    break; // Safety valve: exit early if the next block would blow past maxIns
+                }
+
+                totalProjectedSize += bpSize;
                 temporaryBatch.push_back(bp);
             }
 
