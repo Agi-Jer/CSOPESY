@@ -106,25 +106,9 @@ private:
         }
     }
 
+
     // Round Robin scheduling implementation
     void rr() {
-        if (holdsProcess && currentProcess != nullptr && trackQCycle >= quantumCycle) {
-            currentProcess->runCycle();
-
-            if (!currentProcess->isDelayed()) {
-                currentProcess->setReady();
-                RQ::addToReady(currentPid);
-
-                currentPid = -1;
-                currentProcess = nullptr;
-                holdsProcess = false;
-                trackQCycle = 0;
-
-                pullNextProcess();
-            }
-            return;
-        }
-
         // RR Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
             pullNextProcess();
@@ -163,11 +147,8 @@ private:
             // Scenario C: Process is not finished or waiting, but the time slice has expired!
             // Note: We only check expiration if the process wasn't busy-waiting this turn
             else if (!wasDelayed && trackQCycle >= quantumCycle) {
-                if (currentProcess->isDelayed()) {
-                    // Do nothing
-                } 
                 // SHORT-CIRCUIT GUARD: If no other work is waiting, completely skip context switching overhead
-                else if (RQ::isEmptyReady()) {
+                if (RQ::isEmptyReady()) {
                     trackQCycle = 0; // Refresh quantum allotment
                 } 
                 else {
