@@ -2,33 +2,50 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <vector>
 #include "Screen.h"
 #include "Report.h"
 #include "Process.h"
 #include "BatchGeneration.h"
 
-// Unified header banner showcasing the application header details and ALL configurations
-void showBanner(int numCores, const std::string& scheduler, int quantum, int batchFreq, int minIns, int maxIns, unsigned int delayPerExec) {
-    std::cout << " ▄████████  ▄████████    ▄██████▄     ▄███████▄    ▄████████    ▄████████   ▄██   ▄   \n";
-    std::cout << "███    ███  ███    ███   ███    ███   ███    ███   ███    ███   ███    ███  ███   ██▄ \n";
-    std::cout << "███    █▀   ███    █▀    ███    ███   ███    ███   ███    █▀    ███    █▀   ███▄▄▄███ \n";
-    std::cout << "███         ███          ███    ███   ███    ███  ▄███▄▄▄       ███         ▀▀▀▀▀▀███ \n";
-    std::cout << "███        ▀███████████  ███    ███  ▀█████████▀ ▀▀███▀▀▀     ▀███████████  ▄██   ███ \n";
-    std::cout << "███    █▄           ███  ███    ███   ███          ███    █▄           ███  ███   ███ \n";
-    std::cout << "███    ███    ▄█    ███  ███    ███   ███          ███    ███    ▄█    ███  ███   ███ \n";
-    std::cout << "████████▀   ▄████████▀    ▀██████▀   ▄████▀        ██████████  ▄████████▀    ▀█████▀  \n";
-    std::cout << "--------------------------------------------------------------------------------------\n";
-    std::cout << "Welcome to CSOPESY Emulator!\n\n";
-    std::cout << "Developers: Aglugub, Jerome Andrei C.\n";
-    std::cout << "SYSTEM CONFIGURATION:\n";
-    std::cout << "  Number of Cores:   " << numCores << "\n";
-    std::cout << "  Scheduling Algo:   " << scheduler << "\n";
-    std::cout << "  Quantum Slice:     " << quantum << " cycle(s)\n";
-    std::cout << "  Batch Generation:  " << batchFreq << " cycle(s)\n";
-    std::cout << "  Min Instructions:  " << minIns << "\n";
-    std::cout << "  Max Instructions:  " << maxIns << "\n";
-    std::cout << "  Execution Delay:   " << delayPerExec << " cycle(s)\n";
-    std::cout << "--------------------------------------------------------------------------------------\n\n";
+// Unified header banner showcasing the application header details and ALL configurations as a string
+std::string getBannerString(int numCores, const std::string& scheduler, int quantum, int batchFreq, int minIns, int maxIns, unsigned int delayPerExec) {
+    std::stringstream ss;
+    ss << " ▄████████  ▄████████    ▄██████▄     ▄███████▄    ▄████████    ▄████████   ▄██   ▄   \n";
+    ss << "███    ███  ███    ███   ███    ███   ███    ███   ███    ███   ███    ███  ███   ██▄ \n";
+    ss << "███    █▀   ███    █▀    ███    ███   ███    ███   ███    █▀    ███    █▀   ███▄▄▄███ \n";
+    ss << "███         ███          ███    ███   ███    ███  ▄███▄▄▄       ███         ▀▀▀▀▀▀███ \n";
+    ss << "███        ▀███████████  ███    ███  ▀█████████▀ ▀▀███▀▀▀     ▀███████████  ▄██   ███ \n";
+    ss << "███    █▄           ███  ███    ███   ███          ███    █▄           ███  ███   ███ \n";
+    ss << "███    ███    ▄█    ███  ███    ███   ███          ███    ███    ▄█    ███  ███   ███ \n";
+    ss << "████████▀   ▄████████▀    ▀██████▀   ▄████▀        ██████████  ▄████████▀    ▀█████▀  \n";
+    ss << "--------------------------------------------------------------------------------------\n";
+    ss << "Welcome to CSOPESY Emulator!\n\n";
+    ss << "Developers: Aglugub, Jerome Andrei C.\n";
+    ss << "SYSTEM CONFIGURATION:\n";
+    ss << "  Number of Cores:   " << numCores << "\n";
+    ss << "  Scheduling Algo:   " << scheduler << "\n";
+    ss << "  Quantum Slice:     " << quantum << " cycle(s)\n";
+    ss << "  Batch Generation:  " << batchFreq << " cycle(s)\n";
+    ss << "  Min Instructions:  " << minIns << "\n";
+    ss << "  Max Instructions:  " << maxIns << "\n";
+    ss << "  Execution Delay:   " << delayPerExec << " cycle(s)\n";
+    ss << "--------------------------------------------------------------------------------------\n\n";
+    return ss.str();
+}
+
+// Prints to console and captures it in the history buffer simultaneously
+void printAndRecord(const std::string& text, std::vector<std::string>& historyBuffer) {
+    std::cout << text;
+    historyBuffer.push_back(text);
+}
+
+// Restores the visual state of the main console by vomiting out the entire history buffer
+void restoreConsoleState(const std::vector<std::string>& historyBuffer) {
+    std::system("clear"); 
+    for (const auto& logEntry : historyBuffer) {
+        std::cout << logEntry;
+    }
 }
 
 // Function to safely load ALL 7 spec properties from your workspace config file
@@ -47,7 +64,6 @@ bool parseConfigFile(int& numCores, std::string& scheduler, int& quantum, int& b
             if (key == "num-cpu") {
                 iss >> numCores;
             } else if (key == "scheduler") {
-                // Strips quotation marks around strings like "rr" or "fcfs"
                 iss >> scheduler;
                 if (scheduler.front() == '"' && scheduler.back() == '"') {
                     scheduler = scheduler.substr(1, scheduler.length() - 2);
@@ -90,102 +106,107 @@ int main() {
                 continue; 
             }
 
-            // Place the Config to the correct classes
             CPU::initialize(globalNumCores, globalScheduler, globalQuantumCycles);
             Process::setGlobalDelayPerExec(globalDelayPerExec);
             BatchGeneration::initialize(globalMinIns, globalMaxIns, globalBatchFreq);
             break;
         } 
-        // Allow a clean exit even if they haven't initialized yet
         else if (preInput == "exit") {
             return 0; 
         }
     }
 
+    // Initialize state buffer
+    std::vector<std::string> consoleHistory;
+
     // BOOTSTRAP SUCCESS TRANSITION 
     std::system("clear"); 
-    showBanner(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+    
+    // Generate the initial banner screen state and seed it directly into history
+    std::string initialBanner = getBannerString(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+    printAndRecord(initialBanner, consoleHistory);
 
     // MAIN RUNTIME SCHEDULER INTERACTIVE CLI COMMAND LOOP
     while (true) {
         std::cout << "root:\\> ";
         std::string input;
         std::getline(std::cin, input);
+
+        // Store prompt and user typed value into history log sequence
+        consoleHistory.push_back("root:\\> " + input + "\n");
+
         if (input == "exit") {
             std::cout << "Terminating worker threads and closing console safely...\n";
             
-            // STATELESS CLEANUP: Order matters to prevent hanging blocks
             BatchGeneration::shutdown();
             CPU::shutdown();
             
-            break; // Breaks out of the while(true) loop to end main()
+            break; 
         }
         else if (input == "screen -ls") {
-            Report::printScreenList();
+            // Note: If printScreenList directly uses std::cout internally, you may want to capture 
+            // its response loop within its own reporting class using a string buffer or printAndRecord.
+            std::string listOutput = Report::printScreenList();
+            
+            // Vomit it to the console and record it into history all at once!
+            printAndRecord(listOutput, consoleHistory);
         }
         else if (input == "scheduler-start") {
             BatchGeneration::start();
-            std::cout << "Batch generation activated. Dummy processes are spawning...\n";
+            printAndRecord("Batch generation activated. Dummy processes are spawning...\n", consoleHistory);
         }
         else if (input == "scheduler-stop") {
             BatchGeneration::stop();
-            std::cout << "Batch process generation paused.\n";
+            printAndRecord("Batch process generation paused.\n", consoleHistory);
         }
         else if (input == "report-util") {
             if (Report::generateUtilReport()) {
-                std::cout << "Utilization metrics logged to csopesy-log.txt!\n";
+                printAndRecord("Utilization metrics logged to csopesy-log.txt!\n", consoleHistory);
             } else {
-                std::cout << "Error writing utility log file.\n";
+                printAndRecord("Error writing utility log file.\n", consoleHistory);
             }
         }
-        //Make sure to go last so it doesnt mess with screen -ls
         else if (input.rfind("screen", 0) == 0) {
             
-            // Trim or break apart options via parsing spaces
             std::vector<std::string> tokens;
-            std::string token;
             std::size_t start = 0, end = 0;
             
-            //Tokenize
             while ((end = input.find(' ', start)) != std::string::npos) {
                 if (end != start){
                     tokens.push_back(input.substr(start, end - start));
                 }
                 start = end + 1;
             }
-            if (start < input.size()){ //Get Last Substring
+            if (start < input.size()){ 
                 tokens.push_back(input.substr(start));
             } 
 
-            // Check if argument structural bounds are acceptable
             if (tokens.size() == 3) {
                 std::string mode = tokens[1];
                 std::string name = tokens[2];
 
                 if (mode == "-s") {
-                    // Only clear and redraw if the screen was successfully spawned and entered
                     if (Screen::enterProcessScreen(name, globalMinIns, globalMaxIns)) {
-                        std::system("clear"); 
-                        showBanner(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+                        // User ran exit from process view. Reprint full ledger history.
+                        restoreConsoleState(consoleHistory);
                     }
                 } 
                 else if (mode == "-r") {
-                    // Only clear and redraw if re-attaching successfully found the process
                     if (Screen::enterProcessScreen(name)) {
-                        std::system("clear"); 
-                        showBanner(globalNumCores, globalScheduler, globalQuantumCycles, globalBatchFreq, globalMinIns, globalMaxIns, globalDelayPerExec);
+                        // User ran exit from process view. Reprint full ledger history.
+                        restoreConsoleState(consoleHistory);
                     }
                 }
                 else {
-                    std::cout << "Invalid flag. Use 'screen -s [name]' or 'screen -r [name]'.\n";
+                    printAndRecord("Invalid flag. Use 'screen -s [name]' or 'screen -r [name]'.\n", consoleHistory);
                 }
             } 
             else {
-                std::cout << "Usage error. Format expected: 'screen [-s/-r] [name]'.\n";
+                printAndRecord("Usage error. Format expected: 'screen [-s/-r] [name]'.\n", consoleHistory);
             }
         }
         else {
-            std::cout << "Command not recognized.\n";
+            printAndRecord("Command not recognized.\n", consoleHistory);
         }
     }
 

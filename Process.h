@@ -62,20 +62,23 @@ private:
     unsigned int currentDelayCounter = 0;
 
     // Check if String args is number or variable
-    // If Variable, return the value in symbol table or o
-    // if Doesnt exist in symbol table, declare as 0
-    // Otherwise return the token as int
+    // If Variable, return the value in symbol table or 0
+    // If it doesn't exist in symbol table but matches naming scheme, declare as 0
+    // Otherwise return the token as int literal
     int32_t resolveValue(const std::string& token) {
+        // If it's an already tracked variable, pull its current value
         if (sTable.exists(token)) {
             return std::get<unsigned short>(sTable.getValue(token));
         }
 
-        // Check the central pool inside the generator class
-        if (GenerateProcessInstructions::isTokenInVariablePool(token)) {
+        // Use static helper to verify C++ naming rules for implicit declaration
+        if (SymbolTable::isValidIdentifier(token)) {
+            // Inserts variable "token" as a default uint16 set to 0
             sTable.insert(token, "unsigned short", "0");
             return 0;
         }
 
+        // 3. Otherwise, fall back to parsing it as a raw literal number token
         return std::stoi(token);
     }
 
@@ -145,7 +148,11 @@ private:
     }
 
     void executeDeclare(const std::vector<std::string>& args) {
-        sTable.insert(args[0], "unsigned short", args[1]);
+        if (sTable.exists(args[0])) {
+            sTable.update(args[0], args[1]);
+        } else {
+            sTable.insert(args[0], "unsigned short", args[1]);
+        }
     }
 
     void executePrint(const std::vector<std::string>& args) {

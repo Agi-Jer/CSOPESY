@@ -32,7 +32,18 @@ struct InstructionBlueprint {
 
 class GenerateProcessInstructions {
 private:
-    inline static const std::vector<std::string> VAR_POOL = {"x", "y", "z", "i", "j", "k"};
+    // Generates a completely randomized string token of arbitrary length
+    static std::string randVarName() {
+        // Pick a length: 40% chance of 1 char, 40% chance of 2 chars, 20% chance of 3 chars
+        int roll = rand() % 100;
+        int len = (roll < 4) ? 1 : (roll < 80 ? 2 : 3);
+        
+        std::string name = "";
+        for (int i = 0; i < len; ++i) {
+            name += static_cast<char>('a' + (rand() % 26));
+        }
+        return name;
+    }
 
     // Helper to randomly select between a variable (30% chance) or a number literal (70% chance)
     static std::string selectArgRandomly(const std::string& varToken, const std::string& numToken) {
@@ -57,9 +68,9 @@ private:
         else if (choice == 12)                choice = 4; // SLEEP (Weight 12)
         else if (choice == 13 || choice == 14) choice = 5; // FOR (Weights 13, 14)
 
-        std::string v1 = VAR_POOL[rand() % VAR_POOL.size()];
-        std::string v2 = VAR_POOL[rand() % VAR_POOL.size()];
-        std::string v3 = VAR_POOL[rand() % VAR_POOL.size()];
+        std::string v1 = randVarName();
+        std::string v2 = randVarName();
+        std::string v3 = randVarName();
         std::string randVal = std::to_string(rand() % 50);
         
         switch (choice) {
@@ -154,8 +165,8 @@ public:
             // Generate instructions sequentially at the top level (depth = 1)
             while (totalProjectedSize < (size_t)minIns) {
                 int remainingBuffer = maxIns - static_cast<int>(totalProjectedSize);
-                //InstructionBlueprint bp = generateSingleBlueprint(0, processName, remainingBuffer);
-                InstructionBlueprint bp = generateStep(0, processName, remainingBuffer);
+                InstructionBlueprint bp = generateSingleBlueprint(0, processName, remainingBuffer);
+                //InstructionBlueprint bp = generateStep(0, processName, remainingBuffer);
                 
                 size_t bpSize = bp.calculateFlatSize();
                 if (totalProjectedSize + bpSize > (size_t)maxIns) {
@@ -178,15 +189,6 @@ public:
         return finalProgram;
     }
 
-    // Public static helper to check if a token belongs to the valid variable pool
-    static bool isTokenInVariablePool(const std::string& token) {
-        for (const auto& var : VAR_POOL) {
-            if (token == var) {
-                return true;
-            }
-        }
-        return false;
-    }
 };
 
 #endif

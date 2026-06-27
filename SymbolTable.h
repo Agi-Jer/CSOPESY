@@ -242,6 +242,28 @@ public:
     bool exists(const std::string& name) {
         return table.find(name) != table.end();
     }
+
+    // Check if a token matches the C++ variable naming scheme
+    static bool isValidIdentifier(const std::string& token) {
+        // An empty token is not a valid variable name
+        if (token.empty()) {
+            return false;
+        }
+
+        // Cannot start with a digit
+        if (std::isdigit(static_cast<unsigned char>(token[0]))) {
+            return false;
+        }
+
+        // Every character must be a letter, a digit, or an underscore
+        for (char c : token) {
+            if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 #endif

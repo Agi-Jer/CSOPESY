@@ -160,9 +160,9 @@ public:
     // Pure static implementation
     Report() = delete;
 
-    // Handles the live display for the "screen -ls" command workflow
-    static void printScreenList() {
-        std::cout << buildSnapshotString();
+    // Handles the live display for the "screen -ls" command workflow and returns the payload
+    static std::string printScreenList() {
+        return buildSnapshotString();
     }
 
     // Handles the file export system for the "report-util" command workflow
