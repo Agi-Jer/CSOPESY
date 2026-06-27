@@ -45,10 +45,10 @@ private:
 
     // Background CPU master clock cycle loop thread
     static void runCPULoop() {
-        auto cycleDuration = std::chrono::milliseconds(250); // ~4Hz
-        //auto cycleDuration = std::chrono::milliseconds(100); // 10Hz
+        //auto cycleDuration = std::chrono::milliseconds(250); // ~4Hz
+        auto cycleDuration = std::chrono::milliseconds(100); // 10Hz
         //auto cycleDuration = std::chrono::microseconds(33333); // 30Hz
-        // auto cycleDuration = std::chrono::microseconds(16667); // 60Hz
+        //auto cycleDuration = std::chrono::microseconds(16667); // 60Hz
 
         while (isRunning) {
             auto startTime = std::chrono::steady_clock::now();

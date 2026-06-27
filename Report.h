@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <iomanip>
+#include <sstream>
 #include "RQ.h"
 #include "ProcessMap.h"
 #include "Process.h"
@@ -46,12 +47,17 @@ private:
             if (proc != nullptr) {
                 int coreId = proc->getAssignedCore();
                 std::string coreStr = (coreId >= 0 && coreId < totalCores) ? std::to_string(coreId) : "N/A";
+                coreStr = "Core: " + coreStr;
 
-                output += proc->getName() + "\t" 
-                       + proc->getCreationTime() + "\t"
-                       + "Core: " + coreStr + "\t"
-                       + std::to_string(proc->getCurrentInstruction()) + " / " 
-                       + std::to_string(proc->getTotalInstructions()) + "\n";
+                std::string insStr = std::to_string(proc->getCurrentInstruction()) + " / " + std::to_string(proc->getTotalInstructions());
+
+                std::stringstream ss;
+                ss << std::left  << std::setw(15) << proc->getName()
+                   << std::left  << std::setw(26) << proc->getCreationTime()
+                   << std::left  << std::setw(12) << coreStr
+                   << std::right << std::setw(10) << insStr << "\n";
+
+                output += ss.str();
             }
         }
         if (runningPids.empty()) output += "(No active running processes)\n";

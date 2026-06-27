@@ -108,6 +108,23 @@ private:
 
     // Round Robin scheduling implementation
     void rr() {
+        if (holdsProcess && currentProcess != nullptr && trackQCycle >= quantumCycle) {
+            currentProcess->runCycle();
+
+            if (!currentProcess->isDelayed()) {
+                currentProcess->setReady();
+                RQ::addToReady(currentPid);
+
+                currentPid = -1;
+                currentProcess = nullptr;
+                holdsProcess = false;
+                trackQCycle = 0;
+
+                pullNextProcess();
+            }
+            return;
+        }
+
         // RR Scheduler Action: Grab a process if idle
         if (!holdsProcess) {
             pullNextProcess();
@@ -116,11 +133,18 @@ private:
 
         // Execution of Instruction using the cached pointer directly
         if (holdsProcess && currentProcess != nullptr) {
+            
+            // Check if the process is delayed BEFORE we run the cycle
+            bool wasDelayed = currentProcess->isDelayed();
+
             // runCycle handles execution routing, internal clocks, and auto-finishing flags
             currentProcess->runCycle();
             
-            // Advance our perpetual quantum clock tracker by 1 cycle
-            trackQCycle++;
+            // Only advance the quantum clock if the core actually processed an instruction step,
+            // NOT when it is just burning a clock cycle due to the busy-waiting delay-per-exec.
+            if (!wasDelayed) {
+                trackQCycle++;
+            }
 
             bool dropped = false;
 
@@ -137,9 +161,13 @@ private:
                 dropped = true;
             }
             // Scenario C: Process is not finished or waiting, but the time slice has expired!
-            else if (trackQCycle >= quantumCycle) {
+            // Note: We only check expiration if the process wasn't busy-waiting this turn
+            else if (!wasDelayed && trackQCycle >= quantumCycle) {
+                if (currentProcess->isDelayed()) {
+                    // Do nothing
+                } 
                 // SHORT-CIRCUIT GUARD: If no other work is waiting, completely skip context switching overhead
-                if (RQ::isEmptyReady()) {
+                else if (RQ::isEmptyReady()) {
                     trackQCycle = 0; // Refresh quantum allotment
                 } 
                 else {

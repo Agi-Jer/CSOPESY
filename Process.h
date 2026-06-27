@@ -278,6 +278,11 @@ public:
         return "UNKNOWN";
     }
 
+    // Helper to check if the process is physically executing a busy-wait cycle right now
+    bool isDelayed() const { 
+        return currentDelayCounter > 0; 
+    }
+
     const std::vector<std::string>& getScreenLogBuffer() const {
         return screenLogBuffer;
     }

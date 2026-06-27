@@ -36,7 +36,7 @@ private:
             if (currentCycle == lastCheckedCycle) {
                 // We don't have an object reference anymore—we just sleep a tiny fraction 
                 // of our CPU cycle duration (250ms / 5 = 50ms) to check the state.
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
             lastCheckedCycle = currentCycle;

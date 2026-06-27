@@ -1,64 +1,27 @@
-CPU utilization: 0%
-Cores used: 0
-Cores available: 32
+CPU utilization: 100%
+Cores used: 16
+Cores available: 0
 -------------------------------------------------------
 
 Running processes:
-(No active running processes)
+process_56     (06/27/2026 09:04:24PM)   Core: 10     44 / 5000
+process_218    (06/27/2026 09:04:40PM)   Core: 4      19 / 5000
+process_376    (06/27/2026 09:04:56PM)   Core: 0       9 / 5000
+process_493    (06/27/2026 09:05:08PM)   Core: 6       3 / 5000
+process_286    (06/27/2026 09:04:47PM)   Core: 2      13 / 5000
+process_166    (06/27/2026 09:04:35PM)   Core: 3      23 / 5000
+process_43     (06/27/2026 09:04:23PM)   Core: 8      47 / 5000
+process_494    (06/27/2026 09:05:08PM)   Core: 13      2 / 5000
+process_377    (06/27/2026 09:04:56PM)   Core: 11      7 / 5000
+process_495    (06/27/2026 09:05:08PM)   Core: 7       2 / 5000
+process_287    (06/27/2026 09:04:47PM)   Core: 1      11 / 5000
+process_127    (06/27/2026 09:04:31PM)   Core: 5      26 / 5000
+process_219    (06/27/2026 09:04:40PM)   Core: 14     16 / 5000
+process_496    (06/27/2026 09:05:08PM)   Core: 9       0 / 5000
+process_167    (06/27/2026 09:04:35PM)   Core: 15     20 / 5000
+process_126    (06/27/2026 09:04:31PM)   Core: 12     25 / 5000
 
 Finished processes:
-process_2	(06/24/2026 06:18:43PM)	Finished	100 / 100
-process_0	(06/24/2026 06:18:42PM)	Finished	100 / 100
-process_4	(06/24/2026 06:18:44PM)	Finished	100 / 100
-process_1	(06/24/2026 06:18:43PM)	Finished	100 / 100
-process_12	(06/24/2026 06:18:48PM)	Finished	100 / 100
-process_5	(06/24/2026 06:18:45PM)	Finished	100 / 100
-process_9	(06/24/2026 06:18:47PM)	Finished	100 / 100
-process_3	(06/24/2026 06:18:44PM)	Finished	100 / 100
-process_11	(06/24/2026 06:18:48PM)	Finished	100 / 100
-process_8	(06/24/2026 06:18:46PM)	Finished	100 / 100
-process_6	(06/24/2026 06:18:45PM)	Finished	100 / 100
-process_10	(06/24/2026 06:18:47PM)	Finished	100 / 100
-process_17	(06/24/2026 06:18:51PM)	Finished	100 / 100
-process_7	(06/24/2026 06:18:46PM)	Finished	100 / 100
-process_19	(06/24/2026 06:18:52PM)	Finished	100 / 100
-process_18	(06/24/2026 06:18:51PM)	Finished	100 / 100
-process_20	(06/24/2026 06:18:52PM)	Finished	100 / 100
-process_15	(06/24/2026 06:18:50PM)	Finished	100 / 100
-process_13	(06/24/2026 06:18:49PM)	Finished	100 / 100
-process_25	(06/24/2026 06:18:55PM)	Finished	100 / 100
-process_14	(06/24/2026 06:18:49PM)	Finished	100 / 100
-process_36	(06/24/2026 06:19:00PM)	Finished	100 / 100
-process_22	(06/24/2026 06:18:53PM)	Finished	100 / 100
-process_30	(06/24/2026 06:18:57PM)	Finished	100 / 100
-process_23	(06/24/2026 06:18:54PM)	Finished	100 / 100
-process_39	(06/24/2026 06:19:02PM)	Finished	100 / 100
-process_29	(06/24/2026 06:18:57PM)	Finished	100 / 100
-process_24	(06/24/2026 06:18:54PM)	Finished	100 / 100
-process_26	(06/24/2026 06:18:55PM)	Finished	100 / 100
-process_21	(06/24/2026 06:18:53PM)	Finished	100 / 100
-process_33	(06/24/2026 06:18:59PM)	Finished	100 / 100
-process_31	(06/24/2026 06:18:58PM)	Finished	100 / 100
-process_32	(06/24/2026 06:18:58PM)	Finished	100 / 100
-process_38	(06/24/2026 06:19:01PM)	Finished	100 / 100
-process_44	(06/24/2026 06:19:04PM)	Finished	100 / 100
-process_28	(06/24/2026 06:18:56PM)	Finished	100 / 100
-process_40	(06/24/2026 06:19:02PM)	Finished	100 / 100
-process_42	(06/24/2026 06:19:03PM)	Finished	100 / 100
-process_16	(06/24/2026 06:18:50PM)	Finished	100 / 100
-process_35	(06/24/2026 06:19:00PM)	Finished	100 / 100
-process_27	(06/24/2026 06:18:56PM)	Finished	100 / 100
-process_52	(06/24/2026 06:19:08PM)	Finished	100 / 100
-process_48	(06/24/2026 06:19:06PM)	Finished	100 / 100
-process_41	(06/24/2026 06:19:03PM)	Finished	100 / 100
-process_45	(06/24/2026 06:19:05PM)	Finished	100 / 100
-process_46	(06/24/2026 06:19:05PM)	Finished	100 / 100
-process_34	(06/24/2026 06:18:59PM)	Finished	100 / 100
-process_47	(06/24/2026 06:19:06PM)	Finished	100 / 100
-process_50	(06/24/2026 06:19:07PM)	Finished	100 / 100
-process_51	(06/24/2026 06:19:08PM)	Finished	100 / 100
-process_43	(06/24/2026 06:19:04PM)	Finished	100 / 100
-process_53	(06/24/2026 06:19:09PM)	Finished	100 / 100
-process_37	(06/24/2026 06:19:01PM)	Finished	100 / 100
-process_49	(06/24/2026 06:19:07PM)	Finished	100 / 100
+(No finished processes)
 -------------------------------------------------------
+
