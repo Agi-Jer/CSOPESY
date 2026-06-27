@@ -1,4 +1,4 @@
-"""# CSOPESY - OS Simulation: Process Multiplexer and CLI
+# CSOPESY - OS Simulation: Process Multiplexer and CLI
 
 ## Configuration Setup
 
@@ -46,4 +46,3 @@ On Linux / macOS:
 
 On Windows (Command Prompt / PowerShell):
 csopesy_sim.exe
-"""
