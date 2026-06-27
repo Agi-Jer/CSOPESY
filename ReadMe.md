@@ -1,5 +1,12 @@
 # CSOPESY - OS Simulation: Process Multiplexer and CLI
 
+## Project Metadata
+* Student Name: Jerome Andrei C. Aglugub
+* Source Code Link: https://github.com/Agi-Jer/CSOPESY
+* Entry Class / Main Function File: main.cpp
+
+---
+
 ## Configuration Setup
 
 The simulation reads its environmental constraints from a config.txt file located in the root directory. This configuration dictates the behavior of the hardware threads and the scheduling mechanics.
